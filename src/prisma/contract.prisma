@@ -1,21 +1,180 @@
 // use prisma-next
 
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  username  String?
-  name      String?
-  posts     Post[]
-  createdAt TimestamptzString @default(now())
-  updatedAt temporal.updatedAtString()
+// ── ENUMS ──────────────────────────────────────────
+
+enum Platform {
+  @@type("pg/text@1")
+  youtube = "youtube"
+  twitch  = "twitch"
+  tiktok  = "tiktok"
 }
 
-model Post {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String?
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  Int
+enum SessionStatus {
+  @@type("pg/text@1")
+  live  = "live"
+  ended = "ended"
+}
+
+enum ToxicityLabel {
+  @@type("pg/text@1")
+  safe       = "safe"
+  borderline = "borderline"
+  toxic      = "toxic"
+}
+
+enum ActionType {
+  @@type("pg/text@1")
+  none    = "none"
+  warn    = "warn"
+  delete  = "delete"
+  timeout = "timeout"
+  ban     = "ban"
+}
+
+enum ActionStatus {
+  @@type("pg/text@1")
+  pending = "pending"
+  success = "success"
+  failed  = "failed"
+}
+
+enum TriggeredBy {
+  @@type("pg/text@1")
+  auto   = "auto"
+  manual = "manual"
+}
+
+enum RuleType {
+  @@type("pg/text@1")
+  threshold      = "threshold"
+  blacklist_word = "blacklist_word"
+  whitelist_word = "whitelist_word"
+}
+
+// ── MODELS ─────────────────────────────────────────
+
+model Streamer {
+  id           Uuid              @id @default(uuid())
+  email        String            @unique
+  displayName  String?
+  passwordHash String?
+  plan         String            @default("free")
+
+  connections  PlatformConnection[]
+  rules        ModerationRule[]
+
   createdAt TimestamptzString @default(now())
   updatedAt temporal.updatedAtString()
+
+  @@map("streamers")
+}
+
+model PlatformConnection {
+  id                   Uuid      @id @default(uuid())
+  streamer             Streamer  @relation(fields: [streamerId], references: [id])
+  streamerId           Uuid
+  platform             Platform
+  platformUserId       String
+  platformChannelName  String?
+
+  accessToken          String
+  refreshToken         String?
+  tokenExpiresAt       TimestamptzString?
+  scopes               String[]
+  isActive             Boolean   @default(true)
+  lastSyncedAt         TimestamptzString?
+
+  liveSessions         LiveSession[]
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  @@unique([streamerId, platform, platformUserId])
+  @@index([platform, isActive])
+  @@map("platform_connections")
+}
+
+model LiveSession {
+  id                   Uuid                @id @default(uuid())
+  connection           PlatformConnection  @relation(fields: [connectionId], references: [id])
+  connectionId         Uuid
+  platformLiveId       String
+  title                String?
+  status               SessionStatus       @default(live)
+  startedAt            TimestamptzString   @default(now())
+  endedAt              TimestamptzString?
+  nextPageToken        String?
+
+  chatMessages         ChatMessage[]
+
+  @@index([status])
+  @@map("live_sessions")
+}
+
+model ChatMessage {
+  id                      Uuid          @id @default(uuid())
+  liveSession             LiveSession   @relation(fields: [liveSessionId], references: [id])
+  liveSessionId           Uuid
+  platformMessageId       String
+  platformUserId          String
+  authorDisplayName       String?
+  messageText             String
+  messageTextNormalized   String?
+  sentAt                  TimestamptzString
+
+  moderationResult        ModerationResult?
+  moderationActions       ModerationAction[]
+
+  createdAt TimestamptzString @default(now())
+
+  @@index([liveSessionId, sentAt])
+  @@map("chat_messages")
+}
+
+model ModerationResult {
+  id                      Uuid          @id @default(uuid())
+  chatMessage             ChatMessage   @relation(fields: [chatMessageId], references: [id])
+  chatMessageId           Uuid          @unique
+  toxicityScore           Float
+  toxicityLabel           ToxicityLabel
+  matchedBlacklistWords   String[]
+  modelVersion            String?
+  processingDurationMs    Int?
+
+  createdAt TimestamptzString @default(now())
+
+  @@index([toxicityLabel])
+  @@map("moderation_results")
+}
+
+model ModerationAction {
+  id             Uuid          @id @default(uuid())
+  chatMessage    ChatMessage   @relation(fields: [chatMessageId], references: [id])
+  chatMessageId  Uuid
+  actionType     ActionType
+  reason         String?
+  triggeredBy    TriggeredBy   @default(auto)
+  status         ActionStatus  @default(pending)
+  errorMessage   String?
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  @@index([status])
+  @@map("moderation_actions")
+}
+
+model ModerationRule {
+  id              Uuid      @id @default(uuid())
+  streamer        Streamer  @relation(fields: [streamerId], references: [id])
+  streamerId      Uuid
+  ruleType        RuleType
+  value           Json
+  actionOnTrigger ActionType
+  isActive        Boolean   @default(true)
+
+  createdAt TimestamptzString @default(now())
+  updatedAt temporal.updatedAtString()
+
+  @@map("moderation_rules")
 }

@@ -4,29 +4,163 @@
   "target": "postgres",
   "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
-    "post": {
-      "model": "Post",
+    "chat_messages": {
+      "model": "ChatMessage",
       "namespace": "public"
     },
-    "user": {
-      "model": "User",
+    "live_sessions": {
+      "model": "LiveSession",
+      "namespace": "public"
+    },
+    "moderation_actions": {
+      "model": "ModerationAction",
+      "namespace": "public"
+    },
+    "moderation_results": {
+      "model": "ModerationResult",
+      "namespace": "public"
+    },
+    "moderation_rules": {
+      "model": "ModerationRule",
+      "namespace": "public"
+    },
+    "platform_connections": {
+      "model": "PlatformConnection",
+      "namespace": "public"
+    },
+    "streamers": {
+      "model": "Streamer",
       "namespace": "public"
     }
   },
   "domain": {
     "namespaces": {
       "public": {
-        "models": {
-          "Post": {
-            "fields": {
-              "authorId": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/int4@1",
-                  "kind": "scalar"
-                }
+        "enum": {
+          "ActionStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "pending",
+                "value": "pending"
               },
-              "content": {
+              {
+                "name": "success",
+                "value": "success"
+              },
+              {
+                "name": "failed",
+                "value": "failed"
+              }
+            ]
+          },
+          "ActionType": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "none",
+                "value": "none"
+              },
+              {
+                "name": "warn",
+                "value": "warn"
+              },
+              {
+                "name": "delete",
+                "value": "delete"
+              },
+              {
+                "name": "timeout",
+                "value": "timeout"
+              },
+              {
+                "name": "ban",
+                "value": "ban"
+              }
+            ]
+          },
+          "Platform": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "youtube",
+                "value": "youtube"
+              },
+              {
+                "name": "twitch",
+                "value": "twitch"
+              },
+              {
+                "name": "tiktok",
+                "value": "tiktok"
+              }
+            ]
+          },
+          "RuleType": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "threshold",
+                "value": "threshold"
+              },
+              {
+                "name": "blacklist_word",
+                "value": "blacklist_word"
+              },
+              {
+                "name": "whitelist_word",
+                "value": "whitelist_word"
+              }
+            ]
+          },
+          "SessionStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "live",
+                "value": "live"
+              },
+              {
+                "name": "ended",
+                "value": "ended"
+              }
+            ]
+          },
+          "ToxicityLabel": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "safe",
+                "value": "safe"
+              },
+              {
+                "name": "borderline",
+                "value": "borderline"
+              },
+              {
+                "name": "toxic",
+                "value": "toxic"
+              }
+            ]
+          },
+          "TriggeredBy": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "auto",
+                "value": "auto"
+              },
+              {
+                "name": "manual",
+                "value": "manual"
+              }
+            ]
+          }
+        },
+        "models": {
+          "ChatMessage": {
+            "fields": {
+              "authorDisplayName": {
                 "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
@@ -43,14 +177,720 @@
               "id": {
                 "nullable": false,
                 "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "liveSessionId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "messageText": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "messageTextNormalized": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "platformMessageId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "platformUserId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "sentAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "liveSession": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "liveSessionId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "LiveSession",
+                  "namespace": "public"
+                }
+              },
+              "moderationActions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "chatMessageId"
+                  ]
+                },
+                "to": {
+                  "model": "ModerationAction",
+                  "namespace": "public"
+                }
+              },
+              "moderationResult": {
+                "cardinality": "1:1",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "chatMessageId"
+                  ]
+                },
+                "to": {
+                  "model": "ModerationResult",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "authorDisplayName": {
+                  "column": "authorDisplayName"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "liveSessionId": {
+                  "column": "liveSessionId"
+                },
+                "messageText": {
+                  "column": "messageText"
+                },
+                "messageTextNormalized": {
+                  "column": "messageTextNormalized"
+                },
+                "platformMessageId": {
+                  "column": "platformMessageId"
+                },
+                "platformUserId": {
+                  "column": "platformUserId"
+                },
+                "sentAt": {
+                  "column": "sentAt"
+                }
+              },
+              "namespaceId": "public",
+              "table": "chat_messages"
+            }
+          },
+          "LiveSession": {
+            "fields": {
+              "connectionId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "endedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "nextPageToken": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "platformLiveId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "startedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "SessionStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "title": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "chatMessages": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "liveSessionId"
+                  ]
+                },
+                "to": {
+                  "model": "ChatMessage",
+                  "namespace": "public"
+                }
+              },
+              "connection": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "connectionId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "PlatformConnection",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "connectionId": {
+                  "column": "connectionId"
+                },
+                "endedAt": {
+                  "column": "endedAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "nextPageToken": {
+                  "column": "nextPageToken"
+                },
+                "platformLiveId": {
+                  "column": "platformLiveId"
+                },
+                "startedAt": {
+                  "column": "startedAt"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "title": {
+                  "column": "title"
+                }
+              },
+              "namespaceId": "public",
+              "table": "live_sessions"
+            }
+          },
+          "ModerationAction": {
+            "fields": {
+              "actionType": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ActionType",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "chatMessageId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "errorMessage": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "reason": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ActionStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "triggeredBy": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "TriggeredBy",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "chatMessage": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "chatMessageId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "ChatMessage",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "actionType": {
+                  "column": "actionType"
+                },
+                "chatMessageId": {
+                  "column": "chatMessageId"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "errorMessage": {
+                  "column": "errorMessage"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "reason": {
+                  "column": "reason"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "triggeredBy": {
+                  "column": "triggeredBy"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "public",
+              "table": "moderation_actions"
+            }
+          },
+          "ModerationResult": {
+            "fields": {
+              "chatMessageId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "matchedBlacklistWords": {
+                "many": true,
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "modelVersion": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "processingDurationMs": {
+                "nullable": true,
+                "type": {
                   "codecId": "pg/int4@1",
                   "kind": "scalar"
                 }
               },
-              "title": {
+              "toxicityLabel": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ToxicityLabel",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "toxicityScore": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/float8@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "chatMessage": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "chatMessageId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "ChatMessage",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "chatMessageId": {
+                  "column": "chatMessageId"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "matchedBlacklistWords": {
+                  "column": "matchedBlacklistWords"
+                },
+                "modelVersion": {
+                  "column": "modelVersion"
+                },
+                "processingDurationMs": {
+                  "column": "processingDurationMs"
+                },
+                "toxicityLabel": {
+                  "column": "toxicityLabel"
+                },
+                "toxicityScore": {
+                  "column": "toxicityScore"
+                }
+              },
+              "namespaceId": "public",
+              "table": "moderation_results"
+            }
+          },
+          "ModerationRule": {
+            "fields": {
+              "actionOnTrigger": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ActionType",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "isActive": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "ruleType": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "RuleType",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "streamerId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "value": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/json@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "streamer": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "streamerId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Streamer",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "actionOnTrigger": {
+                  "column": "actionOnTrigger"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "isActive": {
+                  "column": "isActive"
+                },
+                "ruleType": {
+                  "column": "ruleType"
+                },
+                "streamerId": {
+                  "column": "streamerId"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                },
+                "value": {
+                  "column": "value"
+                }
+              },
+              "namespaceId": "public",
+              "table": "moderation_rules"
+            }
+          },
+          "PlatformConnection": {
+            "fields": {
+              "accessToken": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "isActive": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "lastSyncedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "platform": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "Platform",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "platformChannelName": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "platformUserId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "refreshToken": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "scopes": {
+                "many": true,
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "streamerId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/uuid@1",
+                  "kind": "scalar"
+                }
+              },
+              "tokenExpiresAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-string@1",
                   "kind": "scalar"
                 }
               },
@@ -63,29 +903,41 @@
               }
             },
             "relations": {
-              "author": {
+              "liveSessions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "connectionId"
+                  ]
+                },
+                "to": {
+                  "model": "LiveSession",
+                  "namespace": "public"
+                }
+              },
+              "streamer": {
                 "cardinality": "N:1",
                 "on": {
                   "localFields": [
-                    "authorId"
+                    "streamerId"
                   ],
                   "targetFields": [
                     "id"
                   ]
                 },
                 "to": {
-                  "model": "User",
+                  "model": "Streamer",
                   "namespace": "public"
                 }
               }
             },
             "storage": {
               "fields": {
-                "authorId": {
-                  "column": "authorId"
-                },
-                "content": {
-                  "column": "content"
+                "accessToken": {
+                  "column": "accessToken"
                 },
                 "createdAt": {
                   "column": "createdAt"
@@ -93,23 +945,54 @@
                 "id": {
                   "column": "id"
                 },
-                "title": {
-                  "column": "title"
+                "isActive": {
+                  "column": "isActive"
+                },
+                "lastSyncedAt": {
+                  "column": "lastSyncedAt"
+                },
+                "platform": {
+                  "column": "platform"
+                },
+                "platformChannelName": {
+                  "column": "platformChannelName"
+                },
+                "platformUserId": {
+                  "column": "platformUserId"
+                },
+                "refreshToken": {
+                  "column": "refreshToken"
+                },
+                "scopes": {
+                  "column": "scopes"
+                },
+                "streamerId": {
+                  "column": "streamerId"
+                },
+                "tokenExpiresAt": {
+                  "column": "tokenExpiresAt"
                 },
                 "updatedAt": {
                   "column": "updatedAt"
                 }
               },
               "namespaceId": "public",
-              "table": "post"
+              "table": "platform_connections"
             }
           },
-          "User": {
+          "Streamer": {
             "fields": {
               "createdAt": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/timestamptz-string@1",
+                  "kind": "scalar"
+                }
+              },
+              "displayName": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               },
@@ -123,12 +1006,19 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/int4@1",
+                  "codecId": "pg/uuid@1",
                   "kind": "scalar"
                 }
               },
-              "name": {
+              "passwordHash": {
                 "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "plan": {
+                "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -140,28 +1030,36 @@
                   "codecId": "pg/timestamptz-string@1",
                   "kind": "scalar"
                 }
-              },
-              "username": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
               }
             },
             "relations": {
-              "posts": {
+              "connections": {
                 "cardinality": "1:N",
                 "on": {
                   "localFields": [
                     "id"
                   ],
                   "targetFields": [
-                    "authorId"
+                    "streamerId"
                   ]
                 },
                 "to": {
-                  "model": "Post",
+                  "model": "PlatformConnection",
+                  "namespace": "public"
+                }
+              },
+              "rules": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "streamerId"
+                  ]
+                },
+                "to": {
+                  "model": "ModerationRule",
                   "namespace": "public"
                 }
               }
@@ -171,24 +1069,27 @@
                 "createdAt": {
                   "column": "createdAt"
                 },
+                "displayName": {
+                  "column": "displayName"
+                },
                 "email": {
                   "column": "email"
                 },
                 "id": {
                   "column": "id"
                 },
-                "name": {
-                  "column": "name"
+                "passwordHash": {
+                  "column": "passwordHash"
+                },
+                "plan": {
+                  "column": "plan"
                 },
                 "updatedAt": {
                   "column": "updatedAt"
-                },
-                "username": {
-                  "column": "username"
                 }
               },
               "namespaceId": "public",
-              "table": "user"
+              "table": "streamers"
             }
           }
         }
@@ -200,14 +1101,9 @@
       "public": {
         "entries": {
           "table": {
-            "post": {
+            "chat_messages": {
               "columns": {
-                "authorId": {
-                  "codecId": "pg/int4@1",
-                  "nativeType": "int4",
-                  "nullable": false
-                },
-                "content": {
+                "authorDisplayName": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
@@ -222,18 +1118,280 @@
                   "nullable": false
                 },
                 "id": {
-                  "codecId": "pg/int4@1",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "liveSessionId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "messageText": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "messageTextNormalized": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "platformMessageId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "platformUserId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "sentAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "liveSessionId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "chat_messages"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "live_sessions"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "liveSessionId"
+                  ],
+                  "name": "chat_messages_liveSessionId_idx_e1dd0ded",
+                  "prefix": "chat_messages_liveSessionId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "liveSessionId",
+                    "sentAt"
+                  ],
+                  "name": "chat_messages_liveSessionId_sentAt_idx_f632d6e0",
+                  "prefix": "chat_messages_liveSessionId_sentAt_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "live_sessions": {
+              "checks": [
+                {
+                  "expression": "\"status\" IN ('live', 'ended')",
+                  "name": "live_sessions_status_check_4e0fd45c",
+                  "prefix": "live_sessions_status_check"
+                }
+              ],
+              "columns": {
+                "connectionId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "endedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "nextPageToken": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "platformLiveId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "startedAt": {
+                  "codecId": "pg/timestamptz-string@1",
                   "default": {
-                    "expression": "autoincrement()",
+                    "expression": "now()",
                     "kind": "function"
                   },
-                  "nativeType": "int4",
+                  "nativeType": "timestamptz",
                   "nullable": false
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "live"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "SessionStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 },
                 "title": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "connectionId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "live_sessions"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "platform_connections"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "connectionId"
+                  ],
+                  "name": "live_sessions_connectionId_idx_b3eeb6ac",
+                  "prefix": "live_sessions_connectionId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "status"
+                  ],
+                  "name": "live_sessions_status_idx_e98638ab",
+                  "prefix": "live_sessions_status_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "moderation_actions": {
+              "checks": [
+                {
+                  "expression": "\"actionType\" IN ('none', 'warn', 'delete', 'timeout', 'ban')",
+                  "name": "moderation_actions_actionType_check_8c911f4f",
+                  "prefix": "moderation_actions_actionType_check"
+                },
+                {
+                  "expression": "\"status\" IN ('pending', 'success', 'failed')",
+                  "name": "moderation_actions_status_check_660b8f91",
+                  "prefix": "moderation_actions_status_check"
+                },
+                {
+                  "expression": "\"triggeredBy\" IN ('auto', 'manual')",
+                  "name": "moderation_actions_triggeredBy_check_2e584ee0",
+                  "prefix": "moderation_actions_triggeredBy_check"
+                }
+              ],
+              "columns": {
+                "actionType": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ActionType",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "chatMessageId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "errorMessage": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "reason": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "pending"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ActionStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "triggeredBy": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "auto"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "TriggeredBy",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-string@1",
@@ -245,27 +1403,35 @@
                 {
                   "source": {
                     "columns": [
-                      "authorId"
+                      "chatMessageId"
                     ],
                     "namespaceId": "public",
-                    "tableName": "post"
+                    "tableName": "moderation_actions"
                   },
                   "target": {
                     "columns": [
                       "id"
                     ],
                     "namespaceId": "public",
-                    "tableName": "user"
+                    "tableName": "chat_messages"
                   }
                 }
               ],
               "indexes": [
                 {
                   "columns": [
-                    "authorId"
+                    "chatMessageId"
                   ],
-                  "name": "post_authorId_idx_e47547ed",
-                  "prefix": "post_authorId_idx",
+                  "name": "moderation_actions_chatMessageId_idx_d1dd4b1d",
+                  "prefix": "moderation_actions_chatMessageId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "status"
+                  ],
+                  "name": "moderation_actions_status_idx_e98638ab",
+                  "prefix": "moderation_actions_status_idx",
                   "unique": false
                 }
               ],
@@ -276,7 +1442,371 @@
               },
               "uniques": []
             },
-            "user": {
+            "moderation_results": {
+              "checks": [
+                {
+                  "expression": "array_position(\"matchedBlacklistWords\", NULL) IS NULL",
+                  "name": "moderation_results_matchedBlacklistWords_elem_not_null_0410dd5c",
+                  "prefix": "moderation_results_matchedBlacklistWords_elem_not_null"
+                },
+                {
+                  "expression": "\"toxicityLabel\" IN ('safe', 'borderline', 'toxic')",
+                  "name": "moderation_results_toxicityLabel_check_22e5e387",
+                  "prefix": "moderation_results_toxicityLabel_check"
+                }
+              ],
+              "columns": {
+                "chatMessageId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "matchedBlacklistWords": {
+                  "codecId": "pg/text@1",
+                  "many": true,
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "modelVersion": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "processingDurationMs": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
+                "toxicityLabel": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ToxicityLabel",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "toxicityScore": {
+                  "codecId": "pg/float8@1",
+                  "nativeType": "float8",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "chatMessageId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "moderation_results"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "chat_messages"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "toxicityLabel"
+                  ],
+                  "name": "moderation_results_toxicityLabel_idx_cd7f9d38",
+                  "prefix": "moderation_results_toxicityLabel_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "chatMessageId"
+                  ]
+                }
+              ]
+            },
+            "moderation_rules": {
+              "checks": [
+                {
+                  "expression": "\"actionOnTrigger\" IN ('none', 'warn', 'delete', 'timeout', 'ban')",
+                  "name": "moderation_rules_actionOnTrigger_check_ba6a5042",
+                  "prefix": "moderation_rules_actionOnTrigger_check"
+                },
+                {
+                  "expression": "\"ruleType\" IN ('threshold', 'blacklist_word', 'whitelist_word')",
+                  "name": "moderation_rules_ruleType_check_57e4c714",
+                  "prefix": "moderation_rules_ruleType_check"
+                }
+              ],
+              "columns": {
+                "actionOnTrigger": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ActionType",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "isActive": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "ruleType": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "RuleType",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "streamerId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "value": {
+                  "codecId": "pg/json@1",
+                  "nativeType": "json",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "streamerId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "moderation_rules"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "streamers"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "streamerId"
+                  ],
+                  "name": "moderation_rules_streamerId_idx_f8da2721",
+                  "prefix": "moderation_rules_streamerId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "platform_connections": {
+              "checks": [
+                {
+                  "expression": "\"platform\" IN ('youtube', 'twitch', 'tiktok')",
+                  "name": "platform_connections_platform_check_e322121e",
+                  "prefix": "platform_connections_platform_check"
+                },
+                {
+                  "expression": "array_position(\"scopes\", NULL) IS NULL",
+                  "name": "platform_connections_scopes_elem_not_null_de6fcc8e",
+                  "prefix": "platform_connections_scopes_elem_not_null"
+                }
+              ],
+              "columns": {
+                "accessToken": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "isActive": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "lastSyncedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "platform": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "Platform",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "platformChannelName": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "platformUserId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "refreshToken": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "scopes": {
+                  "codecId": "pg/text@1",
+                  "many": true,
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "streamerId": {
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
+                  "nullable": false
+                },
+                "tokenExpiresAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-string@1",
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "streamerId"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "platform_connections"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "streamers"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "platform",
+                    "isActive"
+                  ],
+                  "name": "platform_connections_platform_isActive_idx_67d94537",
+                  "prefix": "platform_connections_platform_isActive_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "streamerId"
+                  ],
+                  "name": "platform_connections_streamerId_idx_f8da2721",
+                  "prefix": "platform_connections_streamerId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "streamerId",
+                    "platform",
+                    "platformUserId"
+                  ]
+                }
+              ]
+            },
+            "streamers": {
               "columns": {
                 "createdAt": {
                   "codecId": "pg/timestamptz-string@1",
@@ -287,34 +1817,39 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "displayName": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "email": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
                 },
                 "id": {
-                  "codecId": "pg/int4@1",
-                  "default": {
-                    "expression": "autoincrement()",
-                    "kind": "function"
-                  },
-                  "nativeType": "int4",
+                  "codecId": "pg/uuid@1",
+                  "nativeType": "uuid",
                   "nullable": false
                 },
-                "name": {
+                "passwordHash": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": true
+                },
+                "plan": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "free"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-string@1",
                   "nativeType": "timestamptz",
                   "nullable": false
-                },
-                "username": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
                 }
               },
               "foreignKeys": [],
@@ -332,31 +1867,107 @@
                 }
               ]
             }
+          },
+          "valueSet": {
+            "ActionStatus": {
+              "kind": "valueSet",
+              "values": [
+                "pending",
+                "success",
+                "failed"
+              ]
+            },
+            "ActionType": {
+              "kind": "valueSet",
+              "values": [
+                "none",
+                "warn",
+                "delete",
+                "timeout",
+                "ban"
+              ]
+            },
+            "Platform": {
+              "kind": "valueSet",
+              "values": [
+                "youtube",
+                "twitch",
+                "tiktok"
+              ]
+            },
+            "RuleType": {
+              "kind": "valueSet",
+              "values": [
+                "threshold",
+                "blacklist_word",
+                "whitelist_word"
+              ]
+            },
+            "SessionStatus": {
+              "kind": "valueSet",
+              "values": [
+                "live",
+                "ended"
+              ]
+            },
+            "ToxicityLabel": {
+              "kind": "valueSet",
+              "values": [
+                "safe",
+                "borderline",
+                "toxic"
+              ]
+            },
+            "TriggeredBy": {
+              "kind": "valueSet",
+              "values": [
+                "auto",
+                "manual"
+              ]
+            }
           }
         },
         "id": "public",
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "1e8412e162dbbe69f4bb3bf8d07f0280ae67eaab15c34dcf201e67468315428d"
+    "storageHash": "ec1518fc2ae7c01315ec9c356a5dc0f493ce1ba90df594ce66f681f61fbdf839"
   },
   "execution": {
-    "executionHash": "4abff323cc88151ef9c9a0ec90122cfee6d46814a118cdb66a9fdd94a4123463",
+    "executionHash": "346255951db6b783a22b13dee804086ce0b5d75a347155d39a958b620024dcb0",
     "mutations": {
       "defaults": [
         {
           "onCreate": {
-            "id": "timestampNow",
-            "kind": "generator"
-          },
-          "onUpdate": {
-            "id": "timestampNow",
+            "id": "uuidv4",
             "kind": "generator"
           },
           "ref": {
-            "column": "updatedAt",
+            "column": "id",
             "namespace": "public",
-            "table": "post"
+            "table": "chat_messages"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "live_sessions"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "moderation_actions"
           }
         },
         {
@@ -371,7 +1982,96 @@
           "ref": {
             "column": "updatedAt",
             "namespace": "public",
-            "table": "user"
+            "table": "moderation_actions"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "moderation_results"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "moderation_rules"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updatedAt",
+            "namespace": "public",
+            "table": "moderation_rules"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "platform_connections"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updatedAt",
+            "namespace": "public",
+            "table": "platform_connections"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "streamers"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "onUpdate": {
+            "id": "timestampNow",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "updatedAt",
+            "namespace": "public",
+            "table": "streamers"
           }
         }
       ]
