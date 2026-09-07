@@ -15,7 +15,7 @@ const BLACKLIST_WORDS = [
 
 async function main() {
   const streamer = await db.orm.public.Streamer.where({
-    email: "test@example.com",
+    email: "andreavindra37@gmail.com",
   }).first();
 
   if (!streamer) throw new Error("Test streamer not found");

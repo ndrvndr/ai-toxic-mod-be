@@ -1,23 +1,21 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { google } from "googleapis";
+import { db } from "../../prisma/db";
 
-import { PrismaService } from "../../prisma.service";
-
-const YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.force-ssl"];
+const YOUTUBE_SCOPES = [
+  "https://www.googleapis.com/auth/youtube.force-ssl",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/userinfo.profile",
+];
 
 @Injectable()
 export class YouTubeAuthService {
   private readonly logger = new Logger(YouTubeAuthService.name);
 
-  constructor(
-    private configService: ConfigService,
-    private prisma: PrismaService,
-  ) {}
+  constructor(private configService: ConfigService) {}
 
   private createOAuthClient() {
-    const redirectUri = this.configService.get<string>("YOUTUBE_REDIRECT_URI");
-    console.log("REDIRECT URI FROM ENV:", JSON.stringify(redirectUri));
     return new google.auth.OAuth2(
       this.configService.get<string>("YOUTUBE_CLIENT_ID"),
       this.configService.get<string>("YOUTUBE_CLIENT_SECRET"),
@@ -25,26 +23,20 @@ export class YouTubeAuthService {
     );
   }
 
-  /**
-   * Construct the URL that will redirect the streamer for login and consent.
-   * The `state` parameter is used to identify which streamer is connecting,
-   * when Google redirects back to our callback.
-   */
-  getAuthUrl(streamerId: string): string {
+  getAuthUrl(): string {
     const client = this.createOAuthClient();
     return client.generateAuthUrl({
-      access_type: "offline", // Mandatory, so you can refresh_token
-      prompt: "consent", // Force the consent screen to appear every time so that a `refresh_token` is always issued.
+      access_type: "offline",
+      prompt: "consent",
       scope: YOUTUBE_SCOPES,
-      state: streamerId,
     });
   }
 
   /**
-   * Exchange the authorization code (from the callback query parameters) for tokens,
-   * then save or update the connection in the platform_connections table.
+   * Login/signup + connect YouTube in one flow.
+   * Return streamers who have successfully logged in (newly created or existing) along with their connections.
    */
-  async handleOAuthCallback(code: string, streamerId: string) {
+  async handleOAuthCallback(code: string) {
     const client = this.createOAuthClient();
     const { tokens } = await client.getToken(code);
 
@@ -52,8 +44,17 @@ export class YouTubeAuthService {
       throw new Error("No access_token returned from Google");
     }
 
-    // Retrieve channel info for the newly logged-in user, to be saved as their identity
     client.setCredentials(tokens);
+
+    // Ambil profile (email, nama) buat identitas Streamer
+    const oauth2 = google.oauth2({ version: "v2", auth: client });
+    const profile = await oauth2.userinfo.get();
+
+    if (!profile.data.email) {
+      throw new Error("Could not retrieve email from Google profile");
+    }
+
+    // Retrieve YouTube channel info for PlatformConnection identity
     const youtube = google.youtube({ version: "v3", auth: client });
     const channelResponse = await youtube.channels.list({
       part: ["snippet"],
@@ -65,16 +66,32 @@ export class YouTubeAuthService {
       throw new Error("Could not retrieve YouTube channel info");
     }
 
-    const connection = await this.prisma.db.orm.public.PlatformConnection.where(
-      {
-        streamerId,
-        platform: "youtube",
-        platformUserId: channel.id,
-      },
-    ).first();
+    // Find-or-create Streamer based on email
+    let streamer = await db.orm.public.Streamer.where({
+      email: profile.data.email,
+    }).first();
 
-    const data = {
-      streamerId,
+    if (!streamer) {
+      streamer = await db.orm.public.Streamer.create({
+        email: profile.data.email,
+        displayName: profile.data.name ?? undefined,
+      });
+      this.logger.log(`Created new streamer: ${streamer.email}`);
+    }
+
+    if (!streamer) {
+      throw new Error("Failed to create or find streamer");
+    }
+
+    // Find-or-create PlatformConnection
+    const existingConnection = await db.orm.public.PlatformConnection.where({
+      streamerId: streamer.id,
+      platform: "youtube",
+      platformUserId: channel.id,
+    }).first();
+
+    const connectionData = {
+      streamerId: streamer.id,
       platform: "youtube" as const,
       platformUserId: channel.id,
       platformChannelName: channel.snippet?.title ?? null,
@@ -87,24 +104,23 @@ export class YouTubeAuthService {
       isActive: true,
     };
 
-    if (connection) {
-      return this.prisma.db.orm.public.PlatformConnection.where({
-        id: connection.id,
-      }).update(data);
+    const connection = existingConnection
+      ? await db.orm.public.PlatformConnection.where({
+          id: existingConnection.id,
+        }).update(connectionData)
+      : await db.orm.public.PlatformConnection.create(connectionData);
+
+    if (!connection) {
+      throw new Error("Failed to create or update platform connection");
     }
 
-    return this.prisma.db.orm.public.PlatformConnection.create(data);
+    return { streamer, connection };
   }
 
-  /**
-   * Refresh access tokens that have/will expire.
-   */
   async refreshAccessToken(connectionId: string) {
-    const connection = await this.prisma.db.orm.public.PlatformConnection.where(
-      {
-        id: connectionId,
-      },
-    ).first();
+    const connection = await db.orm.public.PlatformConnection.where({
+      id: connectionId,
+    }).first();
 
     if (!connection?.refreshToken) {
       throw new Error("No refresh_token available for this connection");
@@ -115,9 +131,7 @@ export class YouTubeAuthService {
 
     const { credentials } = await client.refreshAccessToken();
 
-    return this.prisma.db.orm.public.PlatformConnection.where({
-      id: connectionId,
-    }).update({
+    return db.orm.public.PlatformConnection.where({ id: connectionId }).update({
       accessToken: credentials.access_token!,
       tokenExpiresAt: credentials.expiry_date
         ? new Date(credentials.expiry_date).toISOString()

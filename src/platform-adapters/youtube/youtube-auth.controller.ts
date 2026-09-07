@@ -1,35 +1,47 @@
 import { Controller, Get, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
+
+import { AuthService } from "../../auth/auth.service";
 import { YouTubeAuthService } from "./youtube-auth.service";
 
 @Controller("auth/youtube")
 export class YouTubeAuthController {
-  constructor(private youtubeAuthService: YouTubeAuthService) {}
+  constructor(
+    private youtubeAuthService: YouTubeAuthService,
+    private authService: AuthService,
+  ) {}
 
-  /**
-   * Endpoint yang di-hit dari frontend saat streamer klik "Connect YouTube".
-   * Untuk sekarang, streamerId dikirim manual lewat query param
-   * (nanti diganti ambil dari session/JWT login setelah auth module streamer kita ada).
-   */
   @Get()
-  redirectToGoogle(
-    @Query("streamerId") streamerId: string,
-    @Res() res: Response,
-  ) {
-    const url = this.youtubeAuthService.getAuthUrl(streamerId);
+  redirectToGoogle(@Res() res: Response) {
+    const url = this.youtubeAuthService.getAuthUrl();
     return res.redirect(url);
   }
 
   @Get("callback")
-  async handleCallback(
-    @Query("code") code: string,
-    @Query("state") streamerId: string,
-    @Res() res: Response,
-  ) {
+  async handleCallback(@Query("code") code: string, @Res() res: Response) {
     try {
-      await this.youtubeAuthService.handleOAuthCallback(code, streamerId);
-      // Nanti redirect ke dashboard frontend, untuk sekarang cukup return JSON
-      return res.json({ success: true, message: "YouTube account connected" });
+      const { streamer, connection } =
+        await this.youtubeAuthService.handleOAuthCallback(code);
+
+      const token = this.authService.generateToken({
+        streamerId: streamer.id,
+        email: streamer.email,
+      });
+
+      // For now return JSON (later when the frontend already exists, redirect to the frontend with the token)
+      return res.json({
+        success: true,
+        token,
+        streamer: {
+          id: streamer.id,
+          email: streamer.email,
+          displayName: streamer.displayName,
+        },
+        connection: {
+          id: connection.id,
+          platformChannelName: connection.platformChannelName,
+        },
+      });
     } catch (error) {
       return res.status(500).json({
         success: false,
