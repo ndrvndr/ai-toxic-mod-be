@@ -18,7 +18,8 @@ async function main() {
     platform: "youtube",
   }).first();
 
-  const liveSessionId = "768e7d05-0dd7-4efa-bb66-2729be02db31"; // Adjust your live session ID.
+  const liveSessionId = process.env.TEST_LIVE_SESSION_ID;
+  if (!liveSessionId) throw new Error("TEST_LIVE_SESSION_ID not set in .env");
 
   if (!connection?.refreshToken) throw new Error("No refresh token");
 
@@ -40,6 +41,7 @@ async function main() {
         connectionId,
         streamerId: connection.streamerId,
         liveSessionId,
+        liveChatId,
         message,
       } satisfies ModerationJobData);
     },

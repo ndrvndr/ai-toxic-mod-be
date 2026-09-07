@@ -7,9 +7,12 @@ async function main() {
 
   if (!connection) throw new Error("No YouTube connection found");
 
+  const broadcastId = process.env.TEST_BROADCAST_ID;
+  if (!broadcastId) throw new Error("TEST_BROADCAST_ID not set in .env");
+
   const session = await db.orm.public.LiveSession.create({
     connectionId: connection.id,
-    platformLiveId: "H1SM9xJ1QSA", // Use the previous broadcast ID; change it only for a new live stream.
+    platformLiveId: broadcastId,
     title: "Testing",
     status: "live",
   });

@@ -23,7 +23,8 @@ async function main() {
 
   const youtube = google.youtube({ version: "v3", auth: client });
 
-  const liveChatId = "KicKGFVDMzVvSjlneFBCRFRKQ1dfdFE2Y1dkdxILU0hvczhxNXlsVjQ";
+  const liveChatId = process.env.TEST_LIVE_CHAT_ID;
+  if (!liveChatId) throw new Error("TEST_LIVE_CHAT_ID not set in .env");
 
   const response = await youtube.liveChatMessages.list({
     liveChatId,
