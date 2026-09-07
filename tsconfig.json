@@ -14,9 +14,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "outDir": "dist",
-    "types": [
-      "node"
-    ]
+    "types": ["node", "@types/bun"]
   },
   "include": ["src/**/*.ts"]
 }

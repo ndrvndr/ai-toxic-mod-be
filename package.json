@@ -23,9 +23,12 @@
     "migration:status": "prisma migration status",
     "skills:sync": "prisma skills sync || exit 0",
     "start": "node dist/server.mjs",
-    "postinstall": "prisma skills sync || exit 0"
+    "postinstall": "prisma skills sync || exit 0",
+    "test": "bun test --timeout 60000",
+    "test:watch": "bun test --watch"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "@nestjs/common": "^11.1.17",
     "@nestjs/core": "^11.1.17",
     "@nestjs/platform-express": "^11.1.17",
@@ -38,6 +41,8 @@
     "temporal-polyfill": "^1.0.4"
   },
   "devDependencies": {
+    "@nestjs/testing": "11.2.3",
+    "@types/bun": "^1.4.1",
     "@types/node": "^25.6.2",
     "prisma": "latest",
     "tsdown": "^0.22.14",
