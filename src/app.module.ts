@@ -4,6 +4,8 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 
 import { AppController } from "./app.controller";
 import { AuthModule } from "./auth/auth.module";
+import { LiveSessionsModule } from "./live-sessions/live-sessions.module";
+import { ModerationRulesModule } from "./moderation-rules/moderation-rules.module";
 import { YouTubeModule } from "./platform-adapters/youtube/youtube.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { QueueModule } from "./queue/queue.module";
@@ -27,6 +29,8 @@ import { QueueModule } from "./queue/queue.module";
     YouTubeModule,
     QueueModule,
     AuthModule,
+    ModerationRulesModule,
+    LiveSessionsModule,
   ],
   controllers: [AppController],
   providers: [],
