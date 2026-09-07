@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import type { NormalizedChatMessage } from "../platform-adapters/interfaces";
-import type { PrismaService } from "../prisma.service";
+import { PrismaService } from "../prisma.service";
 import { RuleEngineService } from "./rule-engine.service";
 import { ToxicityClassifierService } from "./toxicity-classifier.service";
 

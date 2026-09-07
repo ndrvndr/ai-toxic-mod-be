@@ -9,7 +9,7 @@ async function main() {
 
   const session = await db.orm.public.LiveSession.create({
     connectionId: connection.id,
-    platformLiveId: "SHos8q5ylV4", // Use the previous broadcast ID; change it only for a new live stream.
+    platformLiveId: "H1SM9xJ1QSA", // Use the previous broadcast ID; change it only for a new live stream.
     title: "Testing",
     status: "live",
   });

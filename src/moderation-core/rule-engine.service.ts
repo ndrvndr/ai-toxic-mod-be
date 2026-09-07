@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 
 import type { ActionType } from "../platform-adapters/interfaces";
-import type { PrismaService } from "../prisma.service";
+import { PrismaService } from "../prisma.service";
 import type { ToxicityClassification } from "./toxicity-classifier.service";
 
 export interface RuleEvaluationResult {

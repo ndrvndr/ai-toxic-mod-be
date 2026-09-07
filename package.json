@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
+    "@nestjs/bullmq": "^12.0.0",
     "@nestjs/common": "^11.1.17",
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^11.1.17",
@@ -37,7 +38,9 @@
     "@prisma/composer-prisma-cloud": "0.17.0",
     "@prisma/orm-postgres": "8.0.0-rc.8",
     "alchemy": "2.0.0-beta.74",
+    "bullmq": "^6.3.4",
     "googleapis": "^178.0.0",
+    "ioredis": "^6.0.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "temporal-polyfill": "^1.0.4"

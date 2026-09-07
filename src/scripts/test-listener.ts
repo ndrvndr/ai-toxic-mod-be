@@ -1,18 +1,24 @@
+import { getQueueToken } from "@nestjs/bullmq";
 import { NestFactory } from "@nestjs/core";
+import type { Queue } from "bullmq";
 
 import { AppModule } from "../app.module";
 import { YouTubeListenerService } from "../platform-adapters/youtube/youtube-listener.service";
 import { db } from "../prisma/db";
+import type { ModerationJobData } from "../queue/moderation.processor";
 
 async function main() {
   const app = await NestFactory.createApplicationContext(AppModule);
   const listener = app.get(YouTubeListenerService);
+  const queue = app.get<Queue<ModerationJobData>>(
+    getQueueToken("moderation-queue"),
+  );
 
   const connection = await db.orm.public.PlatformConnection.where({
     platform: "youtube",
   }).first();
 
-  const liveSessionId = "ae8a283f-6df8-4166-8419-171279d8f9d7"; // Replace with your live session ID
+  const liveSessionId = "768e7d05-0dd7-4efa-bb66-2729be02db31"; // Adjust your live session ID.
 
   if (!connection?.refreshToken) throw new Error("No refresh token");
 
@@ -29,9 +35,13 @@ async function main() {
     connection.refreshToken,
     liveChatId,
     async (connectionId, message) => {
-      console.log(
-        `[NEW MESSAGE] ${message.authorDisplayName}: ${message.text}`,
-      );
+      console.log(`[QUEUEING] ${message.authorDisplayName}: ${message.text}`);
+      await queue.add("process-message", {
+        connectionId,
+        streamerId: connection.streamerId,
+        liveSessionId,
+        message,
+      } satisfies ModerationJobData);
     },
     connection.id,
   );
