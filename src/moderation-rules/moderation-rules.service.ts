@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -21,15 +22,50 @@ export interface UpdateRuleInput {
 
 @Injectable()
 export class ModerationRulesService {
+  private normalizeValue(
+    ruleType: string,
+    value: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (ruleType === "threshold") {
+      const raw = value.threshold;
+      const threshold = typeof raw === "string" ? parseFloat(raw) : raw;
+
+      if (
+        typeof threshold !== "number" ||
+        Number.isNaN(threshold) ||
+        threshold < 0 ||
+        threshold > 1
+      ) {
+        throw new BadRequestException(
+          "threshold must be a number between 0 and 1",
+        );
+      }
+
+      return { threshold };
+    }
+
+    if (ruleType === "blacklist_word" || ruleType === "whitelist_word") {
+      const word = value.word;
+      if (typeof word !== "string" || word.trim().length === 0) {
+        throw new BadRequestException("word must be a non-empty string");
+      }
+      return { word: word.trim().toLowerCase() };
+    }
+
+    return value;
+  }
+
   async list(streamerId: string) {
     return db.orm.public.ModerationRule.where({ streamerId }).all();
   }
 
   async create(streamerId: string, input: CreateRuleInput) {
+    const normalizedValue = this.normalizeValue(input.ruleType, input.value);
+
     return db.orm.public.ModerationRule.create({
       streamerId,
       ruleType: input.ruleType,
-      value: input.value as any, // JSON field; dynamic shape depending on ruleType
+      value: normalizedValue as any, // JSON field; dynamic shape depending on ruleType
       actionOnTrigger: input.actionOnTrigger,
       isActive: true,
     });
@@ -47,8 +83,13 @@ export class ModerationRulesService {
       throw new ForbiddenException("You do not own this rule");
     }
 
+    const updateData: Record<string, unknown> = { ...input };
+    if (input.value) {
+      updateData.value = this.normalizeValue(rule.ruleType, input.value);
+    }
+
     return db.orm.public.ModerationRule.where({ id: ruleId }).update(
-      input as any,
+      updateData as any,
     );
   }
 

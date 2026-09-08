@@ -9,6 +9,7 @@ export interface ModerationDecision {
   shouldTakeAction: boolean;
   actionType: string;
   reason: string;
+  normalizedText: string;
 }
 
 @Injectable()
@@ -49,6 +50,7 @@ export class ModerationCoreService {
       shouldTakeAction: ruleResult.shouldTakeAction,
       actionType: ruleResult.actionType,
       reason: ruleResult.reason,
+      normalizedText,
     };
   }
 

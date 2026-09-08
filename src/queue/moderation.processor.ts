@@ -48,6 +48,13 @@ export class ModerationProcessor extends WorkerHost {
       message,
     );
 
+    // Update the normalized message text that was not populated during creation.
+    await this.prisma.db.orm.public.ChatMessage.where({
+      id: chatMessage.id,
+    }).update({
+      messageTextNormalized: decision.normalizedText,
+    });
+
     this.logger.log(
       `Message from ${message.authorDisplayName}: "${message.text}" -> ${decision.actionType} (${decision.reason})`,
     );
