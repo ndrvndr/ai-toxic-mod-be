@@ -8,15 +8,16 @@ import {
   Post,
   UseGuards,
 } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { CurrentStreamer } from "../auth/current-streamer.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
-import {
-  ModerationRulesService,
-  type CreateRuleInput,
-  type UpdateRuleInput,
-} from "./moderation-rules.service";
+import { CreateRuleDto } from "./dto/create-rule.dto";
+import { UpdateRuleDto } from "./dto/update-rule.dto";
+import { ModerationRulesService } from "./moderation-rules.service";
 
+@ApiTags("Moderation Rules")
+@ApiBearerAuth("access-token")
 @Controller("moderation-rules")
 @UseGuards(JwtAuthGuard)
 export class ModerationRulesController {
@@ -31,7 +32,7 @@ export class ModerationRulesController {
   @Post()
   async create(
     @CurrentStreamer() streamerId: string,
-    @Body() body: CreateRuleInput,
+    @Body() body: CreateRuleDto,
   ) {
     const data = await this.rulesService.create(streamerId, body);
     return { data };
@@ -41,7 +42,7 @@ export class ModerationRulesController {
   async update(
     @CurrentStreamer() streamerId: string,
     @Param("id") id: string,
-    @Body() body: UpdateRuleInput,
+    @Body() body: UpdateRuleDto,
   ) {
     const data = await this.rulesService.update(streamerId, id, body);
     return { data };

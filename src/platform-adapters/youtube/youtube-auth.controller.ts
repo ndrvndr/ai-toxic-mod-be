@@ -1,9 +1,11 @@
 import { Controller, Get, Query, Res } from "@nestjs/common";
+import { ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 
 import { AuthService } from "../../auth/auth.service";
 import { YouTubeAuthService } from "./youtube-auth.service";
 
+@ApiTags("Auth")
 @Controller("auth/youtube")
 export class YouTubeAuthController {
   constructor(
