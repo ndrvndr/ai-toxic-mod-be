@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 
 import { ModerationCoreModule } from "../moderation-core/moderation-core.module";
 import { YouTubeModule } from "../platform-adapters/youtube/youtube.module";
+import { WebsocketModule } from "../websocket/websocket.module";
 import { ModerationProcessor } from "./moderation.processor";
 
 @Module({
@@ -12,6 +13,7 @@ import { ModerationProcessor } from "./moderation.processor";
     }),
     ModerationCoreModule,
     YouTubeModule,
+    WebsocketModule,
   ],
   providers: [ModerationProcessor],
   exports: [BullModule],

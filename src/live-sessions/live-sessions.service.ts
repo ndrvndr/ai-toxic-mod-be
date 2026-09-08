@@ -1,16 +1,26 @@
+import { getQueueToken } from "@nestjs/bullmq";
 import {
+  BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import type { Queue } from "bullmq";
 
+import type { NormalizedChatMessage } from "../platform-adapters/interfaces";
+import { YouTubeListenerService } from "../platform-adapters/youtube/youtube-listener.service";
 import { db } from "../prisma/db";
+import type { ModerationJobData } from "../queue/moderation.processor";
 
 @Injectable()
 export class LiveSessionsService {
-  /**
-   * List all of the streamer's live sessions (across all their connected platforms).
-   */
+  constructor(
+    private youtubeListener: YouTubeListenerService,
+    @Inject(getQueueToken("moderation-queue"))
+    private moderationQueue: Queue<ModerationJobData>,
+  ) {}
+
   async list(streamerId: string) {
     const connections = await db.orm.public.PlatformConnection.where({
       streamerId,
@@ -19,7 +29,6 @@ export class LiveSessionsService {
 
     if (connectionIds.length === 0) return [];
 
-    // Per-connection query, as the syntax for the "in" operator in Prisma 8 has not yet been confirmed.
     const sessionsPerConnection = await Promise.all(
       connectionIds.map((id) =>
         db.orm.public.LiveSession.where({ connectionId: id }).all(),
@@ -42,12 +51,9 @@ export class LiveSessionsService {
       throw new ForbiddenException("You do not own this live session");
     }
 
-    return session;
+    return { session, connection };
   }
 
-  /**
-   * List chat messages for a single live session, with moderation results & actions.
-   */
   async getMessages(streamerId: string, liveSessionId: string) {
     await this.assertOwnership(streamerId, liveSessionId);
 
@@ -55,8 +61,6 @@ export class LiveSessionsService {
       liveSessionId,
     }).all();
 
-    // N+1 queries per message to fetch results & actions -- enough for portfolio scale,
-    // It can be optimized using batch or join queries once the data volume becomes large.
     const enriched = await Promise.all(
       messages.map(async (message) => {
         const result = await db.orm.public.ModerationResult.where({
@@ -65,7 +69,6 @@ export class LiveSessionsService {
         const actions = await db.orm.public.ModerationAction.where({
           chatMessageId: message.id,
         }).all();
-
         return {
           ...message,
           moderationResult: result ?? null,
@@ -77,9 +80,6 @@ export class LiveSessionsService {
     return enriched;
   }
 
-  /**
-   * Simple analytics summary for a single live session.
-   */
   async getAnalytics(streamerId: string, liveSessionId: string) {
     await this.assertOwnership(streamerId, liveSessionId);
 
@@ -111,5 +111,83 @@ export class LiveSessionsService {
         messages.length > 0 ? (flaggedCount / messages.length) * 100 : 0,
       actionBreakdown: actionCounts,
     };
+  }
+
+  async startMonitoring(streamerId: string) {
+    const connection = await db.orm.public.PlatformConnection.where({
+      streamerId,
+      platform: "youtube",
+      isActive: true,
+    }).first();
+
+    if (!connection?.refreshToken) {
+      throw new BadRequestException(
+        "No active YouTube connection found. Please connect your YouTube account first.",
+      );
+    }
+
+    const liveChatId = await this.youtubeListener.findActiveLiveChatId(
+      connection.refreshToken,
+    );
+    if (!liveChatId) {
+      throw new BadRequestException(
+        "No active live stream found on your YouTube channel.",
+      );
+    }
+
+    let session = await db.orm.public.LiveSession.where({
+      connectionId: connection.id,
+      status: "live",
+    }).first();
+
+    if (!session) {
+      session = await db.orm.public.LiveSession.create({
+        connectionId: connection.id,
+        platformLiveId: liveChatId,
+        title: "Live Monitoring",
+        status: "live",
+      });
+    }
+
+    if (!session) {
+      throw new BadRequestException("Failed to create live session");
+    }
+
+    if (this.youtubeListener.isListening(session.id)) {
+      return { session, message: "Already monitoring this session" };
+    }
+
+    const sessionId = session.id;
+
+    await this.youtubeListener.startListening(
+      sessionId,
+      connection.refreshToken,
+      liveChatId,
+      async (connId: string, message: NormalizedChatMessage) => {
+        await this.moderationQueue.add("process-message", {
+          connectionId: connId,
+          streamerId,
+          liveSessionId: sessionId,
+          liveChatId,
+          message,
+        } satisfies ModerationJobData);
+      },
+      connection.id,
+    );
+
+    return { session, message: "Monitoring started" };
+  }
+
+  async stopMonitoring(streamerId: string, liveSessionId: string) {
+    const { session } = await this.assertOwnership(streamerId, liveSessionId);
+
+    this.youtubeListener.stopListening(liveSessionId);
+
+    await db.orm.public.LiveSession.where({ id: liveSessionId }).update({
+      status: "ended",
+      endedAt: new Date().toISOString(),
+    });
+
+    return { message: "Monitoring stopped" };
   }
 }

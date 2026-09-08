@@ -6,6 +6,7 @@ import { ModerationCoreService } from "../moderation-core/moderation-core.servic
 import type { NormalizedChatMessage } from "../platform-adapters/interfaces";
 import { YouTubeActionExecutorService } from "../platform-adapters/youtube/youtube-action-executor.service";
 import { PrismaService } from "../prisma.service";
+import { ModerationGateway } from "../websocket/moderation.gateway";
 
 export interface ModerationJobData {
   connectionId: string;
@@ -23,6 +24,7 @@ export class ModerationProcessor extends WorkerHost {
     private moderationCore: ModerationCoreService,
     private prisma: PrismaService,
     private youtubeExecutor: YouTubeActionExecutorService,
+    private gateway: ModerationGateway,
   ) {
     super();
   }
@@ -58,6 +60,15 @@ export class ModerationProcessor extends WorkerHost {
     this.logger.log(
       `Message from ${message.authorDisplayName}: "${message.text}" -> ${decision.actionType} (${decision.reason})`,
     );
+
+    this.gateway.notifyNewMessage(liveSessionId, {
+      id: chatMessage.id,
+      authorDisplayName: message.authorDisplayName,
+      text: message.text,
+      sentAt: message.sentAt,
+      toxicityLabel: decision.actionType === "none" ? "safe" : "flagged",
+      reason: decision.reason,
+    });
 
     // 3. If action needs to be taken, save it to moderation_actions.
     if (!decision.shouldTakeAction || decision.actionType === "none") {
@@ -103,6 +114,13 @@ export class ModerationProcessor extends WorkerHost {
     }).update({
       status: result.success ? "success" : "failed",
       errorMessage: result.errorMessage,
+    });
+
+    this.gateway.notifyModerationAction(liveSessionId, {
+      chatMessageId: chatMessage.id,
+      actionType: decision.actionType,
+      status: result.success ? "success" : "failed",
+      reason: decision.reason,
     });
   }
 }

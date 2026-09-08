@@ -8,6 +8,7 @@ import { ModerationRulesModule } from "./moderation-rules/moderation-rules.modul
 import { YouTubeModule } from "./platform-adapters/youtube/youtube.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { QueueModule } from "./queue/queue.module";
+import { WebsocketModule } from "./websocket/websocket.module";
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { QueueModule } from "./queue/queue.module";
     AuthModule,
     ModerationRulesModule,
     LiveSessionsModule,
+    WebsocketModule,
   ],
   controllers: [],
   providers: [],

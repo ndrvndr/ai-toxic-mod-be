@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 
 import { CurrentStreamer } from "../auth/current-streamer.decorator";
@@ -33,6 +33,21 @@ export class LiveSessionsController {
     @Param("id") id: string,
   ) {
     const data = await this.liveSessionsService.getAnalytics(streamerId, id);
+    return { data };
+  }
+
+  @Post("start-monitoring")
+  async startMonitoring(@CurrentStreamer() streamerId: string) {
+    const data = await this.liveSessionsService.startMonitoring(streamerId);
+    return { data };
+  }
+
+  @Post(":id/stop-monitoring")
+  async stopMonitoring(
+    @CurrentStreamer() streamerId: string,
+    @Param("id") id: string,
+  ) {
+    const data = await this.liveSessionsService.stopMonitoring(streamerId, id);
     return { data };
   }
 }
