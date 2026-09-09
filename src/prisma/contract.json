@@ -570,6 +570,13 @@
           },
           "ModerationResult": {
             "fields": {
+              "categoryScores": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/json@1",
+                  "kind": "scalar"
+                }
+              },
               "chatMessageId": {
                 "nullable": false,
                 "type": {
@@ -653,6 +660,9 @@
             },
             "storage": {
               "fields": {
+                "categoryScores": {
+                  "column": "categoryScores"
+                },
                 "chatMessageId": {
                   "column": "chatMessageId"
                 },
@@ -1456,6 +1466,11 @@
                 }
               ],
               "columns": {
+                "categoryScores": {
+                  "codecId": "pg/json@1",
+                  "nativeType": "json",
+                  "nullable": true
+                },
                 "chatMessageId": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
@@ -1931,7 +1946,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "ec1518fc2ae7c01315ec9c356a5dc0f493ce1ba90df594ce66f681f61fbdf839"
+    "storageHash": "97151647bcd94f1cc39e0cd55d745a6700f8d30aedcfb4bbe1cb0f65cd4193e7"
   },
   "execution": {
     "executionHash": "346255951db6b783a22b13dee804086ce0b5d75a347155d39a958b620024dcb0",

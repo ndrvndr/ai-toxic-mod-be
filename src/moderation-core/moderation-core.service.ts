@@ -12,6 +12,17 @@ export interface ModerationDecision {
   normalizedText: string;
 }
 
+const LEETSPEAK_MAP: Record<string, string> = {
+  "1": "i",
+  "3": "e",
+  "4": "a",
+  "0": "o",
+  "7": "t",
+  "5": "s",
+  "@": "a",
+  $: "s",
+};
+
 @Injectable()
 export class ModerationCoreService {
   constructor(
@@ -42,6 +53,7 @@ export class ModerationCoreService {
       toxicityScore: classification.score,
       toxicityLabel: classification.label,
       matchedBlacklistWords: ruleResult.matchedBlacklistWords,
+      categoryScores: classification.breakdown as any,
       modelVersion: classification.modelVersion,
       processingDurationMs: durationMs,
     });
@@ -55,9 +67,15 @@ export class ModerationCoreService {
   }
 
   private normalizeText(text: string): string {
-    return text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, "")
+    const lowercased = text.toLowerCase();
+
+    const leetReplaced = lowercased.replace(
+      /[134705$@]/g,
+      (match) => LEETSPEAK_MAP[match] ?? match,
+    );
+
+    return leetReplaced
+      .replace(/[^a-z\s]/g, "")
       .replace(/\s+/g, " ")
       .trim();
   }

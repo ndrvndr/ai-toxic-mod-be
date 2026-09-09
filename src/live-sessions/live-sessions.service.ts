@@ -126,24 +126,39 @@ export class LiveSessionsService {
       );
     }
 
-    const liveChatId = await this.youtubeListener.findActiveLiveChatId(
+    const broadcast = await this.youtubeListener.findActiveBroadcast(
       connection.refreshToken,
     );
-    if (!liveChatId) {
+    if (!broadcast) {
       throw new BadRequestException(
         "No active live stream found on your YouTube channel.",
       );
     }
 
+    const { broadcastId, liveChatId } = broadcast;
+
     let session = await db.orm.public.LiveSession.where({
       connectionId: connection.id,
-      status: "live",
+      platformLiveId: broadcastId,
     }).first();
 
     if (!session) {
+      const staleSessions = await db.orm.public.LiveSession.where({
+        connectionId: connection.id,
+        status: "live",
+      }).all();
+
+      for (const stale of staleSessions) {
+        this.youtubeListener.stopListening(stale.id);
+        await db.orm.public.LiveSession.where({ id: stale.id }).update({
+          status: "ended",
+          endedAt: new Date().toISOString(),
+        });
+      }
+
       session = await db.orm.public.LiveSession.create({
         connectionId: connection.id,
-        platformLiveId: liveChatId,
+        platformLiveId: broadcastId,
         title: "Live Monitoring",
         status: "live",
       });

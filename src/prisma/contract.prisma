@@ -138,6 +138,7 @@ model ModerationResult {
   toxicityScore           Float
   toxicityLabel           ToxicityLabel
   matchedBlacklistWords   String[]
+  categoryScores          Json?
   modelVersion            String?
   processingDurationMs    Int?
 

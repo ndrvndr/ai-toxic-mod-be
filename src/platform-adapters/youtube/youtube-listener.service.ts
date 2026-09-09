@@ -141,4 +141,27 @@ export class YouTubeListenerService {
   isListening(liveSessionId: string): boolean {
     return this.activePollings.has(liveSessionId);
   }
+
+  async findActiveBroadcast(
+    refreshToken: string,
+  ): Promise<{ broadcastId: string; liveChatId: string } | null> {
+    const client = this.createOAuthClient(refreshToken);
+    const youtube = google.youtube({ version: "v3", auth: client });
+
+    const response = await youtube.liveBroadcasts.list({
+      part: ["snippet", "status"],
+      broadcastStatus: "active",
+      broadcastType: "all",
+    });
+
+    const broadcast = response.data.items?.[0];
+    if (!broadcast?.id || !broadcast.snippet?.liveChatId) {
+      return null;
+    }
+
+    return {
+      broadcastId: broadcast.id,
+      liveChatId: broadcast.snippet.liveChatId,
+    };
+  }
 }
