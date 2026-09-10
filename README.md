@@ -9,9 +9,9 @@ An AI-assisted, context-aware, configurable moderation system for YouTube Live C
 - **Google OAuth login** that doubles as YouTube channel connection (one-step signup)
 - **Real-time live chat listener** via YouTube Data API v3, with automatic resume via `nextPageToken` on reconnect
 - **Multi-label toxicity classification** (toxic, severe_toxic, obscene, threat, insult, identity_hate) via a Transformer model — not just a binary toxic/safe score
-- **Configurable moderation rules per streamer**: toxicity threshold, custom blacklist/whitelist words, per-rule action (warn / delete / timeout / ban)
-- **Leetspeak-aware normalization** (`anj1ng` → `anjing`) to reduce trivial blacklist evasion
-- **Automatic action execution** back to YouTube (delete message, ban, timeout) via the YouTube Data API
+- **Configurable moderation rules per streamer**: toxicity threshold, custom blacklist words, per-rule action (warn / delete / timeout / ban). _(Whitelist-word rules and the timeout/ban action paths are implemented but have not yet been exercised in live testing — see [Testing Coverage Notes](#testing-coverage-notes).)_
+- **Leetspeak-aware normalization** (`id10t` → `idiot`) to reduce trivial blacklist evasion
+- **Automatic action execution** back to YouTube via the YouTube Data API. `delete` has been verified end-to-end against a real live stream; `ban` and `timeout` follow the same code path but have not yet been triggered in a live test
 - **Async, queue-based processing** (BullMQ + Redis) so chat ingestion never blocks on classification or API calls
 - **Real-time WebSocket feed** so a dashboard can show flagged messages and moderation actions as they happen
 - **REST API with Swagger docs** for rules management, live session history, and analytics
@@ -144,13 +144,33 @@ Full interactive documentation: `/docs`.
 
 YouTube already ships with blocked-word lists, human moderators, and automatic held-for-review filtering for severe violations. A system that just deletes messages matching a keyword list adds little on top of that. This project is instead framed around three gaps native tools don't close:
 
-1. **Context over exact match.** A blocklist can't catch `"wah pinter banget ya lu, pinter bikin tim kalah"` — no profanity, but the sentence is sarcastic and insulting. In our own testing, the toxicity classifier scored this at **0.88** (flagged), where a keyword filter would have let it through entirely.
+1. **Context over exact match.** A blocklist can only catch messages containing an exact banned word. A sarcastic or backhanded insult with zero profanity (e.g. praising someone's skill while implying the opposite) can carry real toxicity that a keyword filter is structurally incapable of catching. A context-aware classifier is designed to catch a meaningfully wider range of these cases than exact-match filtering — see [Testing Coverage Notes](#testing-coverage-notes) for what has and hasn't been empirically confirmed so far.
 2. **Multi-category insight, not a single toxic/safe flag.** Every message is scored across six categories (toxic, severe_toxic, obscene, threat, insult, identity_hate), so a streamer — or a future policy engine — can react differently to an insult versus a threat.
 3. **Cross-platform potential.** Native moderation tools are siloed per platform. The adapter architecture here is built so the same moderation core can eventually serve Twitch and TikTok from one dashboard — something no single platform's built-in tools can offer.
 
+## Testing Coverage Notes
+
+Everything described above as "verified" or "tested" was exercised against a real YouTube live stream during development, not just unit-tested in isolation. For transparency, here's what has and hasn't been exercised end-to-end:
+
+**Verified in live testing:**
+
+- OAuth login/signup flow, including token refresh handling
+- Live chat polling and resume via `nextPageToken`
+- Multi-label toxicity classification on English messages
+- Blacklist-word matching, including leetspeak-normalized matches
+- Threshold-based flagging on English messages, including subtle/sarcastic phrasing without explicit profanity
+- `delete` action executed against the YouTube Data API, confirmed removed from the chat via a follow-up API read
+- Real-time WebSocket broadcast of both new messages and moderation actions
+- REST endpoints for rules CRUD, live session listing, message history, and analytics
+
+**Implemented but not yet exercised in live testing:**
+
+- Whitelist-word rules (the code path exists in `RuleEngineService`, but no whitelist rule has been created and tested against real chat)
+- `ban` and `timeout` actions (implemented in `YouTubeActionExecutorService` following the same pattern as `delete`, but never triggered against a real live chat user)
+
 ## Known Limitations
 
-- **English-trained model.** `Xenova/toxic-bert` is trained on English data (Jigsaw dataset). It occasionally generalizes to Indonesian sarcasm/insults (see example above), but this is inconsistent — subtler identity-based insults in Indonesian were not reliably detected in testing. A blacklist layer covers the most common explicit Indonesian profanity as a stopgap; a fine-tuned or multilingual model is a natural next step.
+- **English-trained model.** `Xenova/toxic-bert` is trained on English data (Jigsaw dataset). It has not been validated for non-English input as part of this project — reliability on other languages is unknown and should be assumed limited until tested. Non-English deployments would need either a language-specific model or a fine-tuned/multilingual alternative (see Roadmap).
 - **Some messages never reach this system at all.** YouTube automatically holds or blocks certain messages (explicit threats, stacked profanity) before they're ever exposed via the Data API. This was confirmed during testing — such messages don't appear even to the broadcaster's own client. This system operates as an additional layer on top of YouTube's own filtering, not a replacement for it.
 - **N+1 query pattern** in `getMessages`/`getAnalytics` (one query per message for its moderation result/actions). Fine at portfolio scale; would need batching/joins for high-volume production use.
 - **CORS is fully open (`origin: '*'`)** for development convenience. Should be restricted to a known frontend origin before any public deployment.
