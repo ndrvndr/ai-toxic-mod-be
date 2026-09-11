@@ -1,8 +1,11 @@
-import { Controller, Get, Query, Res } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { Controller, Get, Post, Query, Res, UseGuards } from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import type { Response } from "express";
 
 import { AuthService } from "../../auth/auth.service";
+import { CurrentStreamer } from "../../auth/current-streamer.decorator";
+import { JwtAuthGuard } from "../../auth/jwt-auth.guard";
+import { db } from "../../prisma/db";
 import { YouTubeAuthService } from "./youtube-auth.service";
 
 const COOKIE_NAME = "auth_token";
@@ -52,10 +55,30 @@ export class YouTubeAuthController {
     }
   }
 
-  @Get("logout")
+  @Post("logout")
   logout(@Res() res: Response) {
     res.clearCookie(COOKIE_NAME, { path: "/" });
-    const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:3001";
-    return res.redirect(`${frontendUrl}/login`);
+    return res.json({ success: true });
+  }
+
+  @Get("me")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth("access-token")
+  async getCurrentStreamer(@CurrentStreamer() streamerId: string) {
+    const streamer = await db.orm.public.Streamer.where({
+      id: streamerId,
+    }).first();
+
+    if (!streamer) {
+      return { data: null };
+    }
+
+    return {
+      data: {
+        id: streamer.id,
+        email: streamer.email,
+        displayName: streamer.displayName,
+      },
+    };
   }
 }
