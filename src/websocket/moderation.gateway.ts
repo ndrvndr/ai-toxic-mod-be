@@ -20,7 +20,10 @@ interface SocketData {
 }
 
 @WebSocketGateway({
-  cors: { origin: "*" },
+  cors: {
+    origin: process.env.FRONTEND_URL ?? "http://localhost:3001",
+    credentials: true,
+  },
   namespace: "moderation",
 })
 export class ModerationGateway
@@ -34,7 +37,13 @@ export class ModerationGateway
   constructor(private authService: AuthService) {}
 
   handleConnection(client: Socket) {
-    const token = client.handshake.auth?.token as string | undefined;
+    const tokenFromAuth = client.handshake.auth?.token as string | undefined;
+    const cookieHeader = client.handshake.headers.cookie;
+    const tokenFromCookie = cookieHeader
+      ? this.parseCookie(cookieHeader, "auth_token")
+      : undefined;
+
+    const token = tokenFromAuth ?? tokenFromCookie;
 
     if (!token) {
       this.logger.warn(`Client ${client.id} rejected: no token`);
@@ -52,6 +61,11 @@ export class ModerationGateway
       this.logger.warn(`Client ${client.id} rejected: invalid token`);
       client.disconnect();
     }
+  }
+
+  private parseCookie(cookieHeader: string, name: string): string | undefined {
+    const match = cookieHeader.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+    return match ? decodeURIComponent(match[1]) : undefined;
   }
 
   handleDisconnect(client: Socket) {

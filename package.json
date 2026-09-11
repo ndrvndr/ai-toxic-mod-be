@@ -45,6 +45,7 @@
     "bullmq": "^6.3.4",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "cookie-parser": "^1.4.7",
     "googleapis": "^178.0.0",
     "ioredis": "^6.0.0",
     "reflect-metadata": "^0.2.2",
@@ -56,6 +57,7 @@
   "devDependencies": {
     "@nestjs/testing": "11.2.3",
     "@types/bun": "^1.4.1",
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
     "@types/node": "^26.5.0",
     "prisma": "latest",

@@ -3,12 +3,18 @@ import "reflect-metadata";
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import cookieParser from "cookie-parser";
 
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors();
+
+  app.use(cookieParser());
+  app.enableCors({
+    origin: process.env.FRONTEND_URL ?? "http://localhost:3001",
+    credentials: true,
+  });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const config = new DocumentBuilder()
@@ -32,6 +38,7 @@ async function bootstrap() {
       : 3000;
   await app.listen(port);
   console.log(`Server running at http://localhost:${port}`);
+  console.log(`Swagger docs at http://localhost:${port}/docs`);
 }
 
 bootstrap().catch((error) => {

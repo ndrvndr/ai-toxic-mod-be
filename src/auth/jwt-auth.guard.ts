@@ -9,15 +9,11 @@ export class JwtAuthGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers.authorization;
 
-    if (!authHeader?.startsWith("Bearer ")) {
-      throw new UnauthorizedException(
-        "Missing or invalid Authorization header",
-      );
+    const token = this.extractToken(request);
+    if (!token) {
+      throw new UnauthorizedException("Missing authentication token");
     }
-
-    const token = authHeader.substring(7);
 
     try {
       const payload = this.authService.verifyToken(token);
@@ -26,5 +22,18 @@ export class JwtAuthGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException("Invalid or expired token");
     }
+  }
+
+  private extractToken(request: any): string | null {
+    if (request.cookies?.auth_token) {
+      return request.cookies.auth_token;
+    }
+
+    const authHeader = request.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      return authHeader.substring(7);
+    }
+
+    return null;
   }
 }

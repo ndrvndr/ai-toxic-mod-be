@@ -5,24 +5,29 @@ import type { Response } from "express";
 import { AuthService } from "../../auth/auth.service";
 import { YouTubeAuthService } from "./youtube-auth.service";
 
+const COOKIE_NAME = "auth_token";
+const isProduction = process.env.NODE_ENV === "production";
+
 @ApiTags("Auth")
-@Controller("auth/youtube")
+@Controller("auth")
 export class YouTubeAuthController {
   constructor(
     private youtubeAuthService: YouTubeAuthService,
     private authService: AuthService,
   ) {}
 
-  @Get()
+  @Get("login")
   redirectToGoogle(@Res() res: Response) {
     const url = this.youtubeAuthService.getAuthUrl();
     return res.redirect(url);
   }
 
-  @Get("callback")
+  @Get("youtube/callback")
   async handleCallback(@Query("code") code: string, @Res() res: Response) {
+    const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:3001";
+
     try {
-      const { streamer, connection } =
+      const { streamer } =
         await this.youtubeAuthService.handleOAuthCallback(code);
 
       const token = this.authService.generateToken({
@@ -30,25 +35,27 @@ export class YouTubeAuthController {
         email: streamer.email,
       });
 
-      // For now return JSON (later when the frontend already exists, redirect to the frontend with the token)
-      return res.json({
-        success: true,
-        token,
-        streamer: {
-          id: streamer.id,
-          email: streamer.email,
-          displayName: streamer.displayName,
-        },
-        connection: {
-          id: connection.id,
-          platformChannelName: connection.platformChannelName,
-        },
+      res.cookie(COOKIE_NAME, token, {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: "/",
       });
+
+      return res.redirect(`${frontendUrl}/auth/callback`);
     } catch (error) {
-      return res.status(500).json({
-        success: false,
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return res.redirect(
+        `${frontendUrl}/login?error=${encodeURIComponent(message)}`,
+      );
     }
+  }
+
+  @Get("logout")
+  logout(@Res() res: Response) {
+    res.clearCookie(COOKIE_NAME, { path: "/" });
+    const frontendUrl = process.env.FRONTEND_URL ?? "http://localhost:3001";
+    return res.redirect(`${frontendUrl}/login`);
   }
 }
