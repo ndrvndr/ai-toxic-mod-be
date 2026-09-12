@@ -1,21 +1,21 @@
 import { db } from "../prisma/db";
 
 const BLACKLIST_WORDS = [
-  "tolol",
-  "goblok",
-  "bego",
-  "bangsat",
-  "anjing",
-  "kontol",
-  "memek",
-  "bajingan",
-  "idiot",
-  "stupid",
+  "fuck",
+  "fucking",
+  "shit",
+  "bitch",
+  "asshole",
+  "dick",
+  "dumbass",
+  "bastard",
+  "motherfucker",
+  "bullshit",
 ];
 
 async function main() {
   const streamer = await db.orm.public.Streamer.where({
-    email: "andreavindra37@gmail.com",
+    email: process.env.EMAIL,
   }).first();
 
   if (!streamer) throw new Error("Test streamer not found");
