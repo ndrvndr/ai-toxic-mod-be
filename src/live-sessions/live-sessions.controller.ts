@@ -1,5 +1,14 @@
-import { Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import {
+  Controller,
+  DefaultValuePipe,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiQuery, ApiTags } from "@nestjs/swagger";
 
 import { CurrentStreamer } from "../auth/current-streamer.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -16,6 +25,39 @@ export class LiveSessionsController {
   async list(@CurrentStreamer() streamerId: string) {
     const data = await this.liveSessionsService.list(streamerId);
     return { data };
+  }
+
+  @Get("overview")
+  async getOverview(@CurrentStreamer() streamerId: string) {
+    const data = await this.liveSessionsService.getOverview(streamerId);
+    return { data };
+  }
+
+  @Get("history")
+  @ApiQuery({
+    name: "page",
+    required: false,
+    type: Number,
+    schema: { default: 1 },
+  })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    type: Number,
+    schema: { default: 10 },
+  })
+  @ApiQuery({ name: "search", required: false, type: String })
+  async getHistory(
+    @CurrentStreamer() streamerId: string,
+    @Query("page", new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query("limit", new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query("search") search?: string,
+  ) {
+    return this.liveSessionsService.listPaginated(streamerId, {
+      page,
+      limit,
+      search,
+    });
   }
 
   @Get(":id/messages")
@@ -48,12 +90,6 @@ export class LiveSessionsController {
     @Param("id") id: string,
   ) {
     const data = await this.liveSessionsService.stopMonitoring(streamerId, id);
-    return { data };
-  }
-
-  @Get("overview")
-  async getOverview(@CurrentStreamer() streamerId: string) {
-    const data = await this.liveSessionsService.getOverview(streamerId);
     return { data };
   }
 }

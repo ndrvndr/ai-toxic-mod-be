@@ -43,6 +43,52 @@ export class LiveSessionsService {
       );
   }
 
+  async listPaginated(
+    streamerId: string,
+    options: { page: number; limit: number; search?: string },
+  ) {
+    const { page, limit, search } = options;
+
+    const connections = await db.orm.public.PlatformConnection.where({
+      streamerId,
+    }).all();
+    const connectionIds = connections.map((c) => c.id);
+
+    if (connectionIds.length === 0) {
+      return { data: [], meta: { page, limit, total: 0, totalPages: 0 } };
+    }
+
+    const sessionsPerConnection = await Promise.all(
+      connectionIds.map((id) =>
+        db.orm.public.LiveSession.where({ connectionId: id }).all(),
+      ),
+    );
+
+    let allSessions = sessionsPerConnection
+      .flat()
+      .sort(
+        (a, b) =>
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      );
+
+    if (search?.trim()) {
+      const query = search.trim().toLowerCase();
+      allSessions = allSessions.filter((s) =>
+        (s.title ?? s.platformLiveId).toLowerCase().includes(query),
+      );
+    }
+
+    const total = allSessions.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const start = (page - 1) * limit;
+    const paginatedData = allSessions.slice(start, start + limit);
+
+    return {
+      data: paginatedData,
+      meta: { page, limit, total, totalPages },
+    };
+  }
+
   private async assertOwnership(streamerId: string, liveSessionId: string) {
     const session = await db.orm.public.LiveSession.where({
       id: liveSessionId,
