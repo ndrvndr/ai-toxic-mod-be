@@ -205,4 +205,67 @@ export class LiveSessionsService {
 
     return { message: "Monitoring stopped" };
   }
+
+  async getOverview(streamerId: string) {
+    const connections = await db.orm.public.PlatformConnection.where({
+      streamerId,
+    }).all();
+    const connectionIds = connections.map((c) => c.id);
+
+    const sessionsPerConnection = await Promise.all(
+      connectionIds.map((id) =>
+        db.orm.public.LiveSession.where({ connectionId: id }).all(),
+      ),
+    );
+    const allSessions = sessionsPerConnection.flat();
+
+    const activeSession = allSessions.find((s) => s.status === "live") ?? null;
+
+    let totalMessages = 0;
+    let totalFlagged = 0;
+    const actionBreakdown: Record<string, number> = {};
+
+    for (const session of allSessions) {
+      const messages = await db.orm.public.ChatMessage.where({
+        liveSessionId: session.id,
+      }).all();
+      totalMessages += messages.length;
+
+      for (const message of messages) {
+        const actions = await db.orm.public.ModerationAction.where({
+          chatMessageId: message.id,
+        }).all();
+        if (actions.length > 0) {
+          totalFlagged++;
+          for (const action of actions) {
+            actionBreakdown[action.actionType] =
+              (actionBreakdown[action.actionType] ?? 0) + 1;
+          }
+        }
+      }
+    }
+
+    const rules = await db.orm.public.ModerationRule.where({
+      streamerId,
+    }).all();
+
+    const recentSessions = [...allSessions]
+      .sort(
+        (a, b) =>
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      )
+      .slice(0, 5);
+
+    return {
+      totalSessions: allSessions.length,
+      activeSession,
+      totalMessages,
+      totalFlagged,
+      flaggedPercentage:
+        totalMessages > 0 ? (totalFlagged / totalMessages) * 100 : 0,
+      actionBreakdown,
+      totalRules: rules.length,
+      recentSessions,
+    };
+  }
 }

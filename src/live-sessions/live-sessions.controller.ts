@@ -50,4 +50,10 @@ export class LiveSessionsController {
     const data = await this.liveSessionsService.stopMonitoring(streamerId, id);
     return { data };
   }
+
+  @Get("overview")
+  async getOverview(@CurrentStreamer() streamerId: string) {
+    const data = await this.liveSessionsService.getOverview(streamerId);
+    return { data };
+  }
 }
