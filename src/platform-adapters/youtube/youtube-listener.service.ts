@@ -144,7 +144,11 @@ export class YouTubeListenerService {
 
   async findActiveBroadcast(
     refreshToken: string,
-  ): Promise<{ broadcastId: string; liveChatId: string } | null> {
+  ): Promise<{
+    broadcastId: string;
+    liveChatId: string;
+    title: string;
+  } | null> {
     const client = this.createOAuthClient(refreshToken);
     const youtube = google.youtube({ version: "v3", auth: client });
 
@@ -162,6 +166,7 @@ export class YouTubeListenerService {
     return {
       broadcastId: broadcast.id,
       liveChatId: broadcast.snippet.liveChatId,
+      title: broadcast.snippet.title ?? "Untitled Stream",
     };
   }
 }

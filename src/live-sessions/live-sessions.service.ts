@@ -35,7 +35,12 @@ export class LiveSessionsService {
       ),
     );
 
-    return sessionsPerConnection.flat();
+    return sessionsPerConnection
+      .flat()
+      .sort(
+        (a, b) =>
+          new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+      );
   }
 
   private async assertOwnership(streamerId: string, liveSessionId: string) {
@@ -135,7 +140,7 @@ export class LiveSessionsService {
       );
     }
 
-    const { broadcastId, liveChatId } = broadcast;
+    const { broadcastId, liveChatId, title } = broadcast;
 
     let session = await db.orm.public.LiveSession.where({
       connectionId: connection.id,
@@ -159,7 +164,7 @@ export class LiveSessionsService {
       session = await db.orm.public.LiveSession.create({
         connectionId: connection.id,
         platformLiveId: broadcastId,
-        title: "Live Monitoring",
+        title,
         status: "live",
       });
     }
