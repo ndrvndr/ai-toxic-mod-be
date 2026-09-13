@@ -1,8 +1,11 @@
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 
 import { AuthModule } from "./auth/auth.module";
+import { CsrfGuard } from "./auth/csrf.guard";
 import { LiveSessionsModule } from "./live-sessions/live-sessions.module";
 import { ModerationRulesModule } from "./moderation-rules/moderation-rules.module";
 import { YouTubeModule } from "./platform-adapters/youtube/youtube.module";
@@ -32,8 +35,23 @@ import { WebsocketModule } from "./websocket/websocket.module";
     ModerationRulesModule,
     LiveSessionsModule,
     WebsocketModule,
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: CsrfGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 
 import { CurrentStreamer } from "../auth/current-streamer.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -30,6 +31,7 @@ export class ModerationRulesController {
   }
 
   @Post()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async create(
     @CurrentStreamer() streamerId: string,
     @Body() body: CreateRuleDto,

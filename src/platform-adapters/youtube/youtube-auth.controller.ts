@@ -1,5 +1,15 @@
-import { Controller, Get, Post, Query, Res, UseGuards } from "@nestjs/common";
+import {
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { SkipThrottle } from "@nestjs/throttler";
+import { randomBytes } from "crypto";
 import type { Response } from "express";
 
 import { AuthService } from "../../auth/auth.service";
@@ -10,6 +20,7 @@ import { YouTubeAuthService } from "./youtube-auth.service";
 
 const COOKIE_NAME = "auth_token";
 const isProduction = process.env.NODE_ENV === "production";
+const CSRF_COOKIE_NAME = "csrf_token";
 
 @ApiTags("Auth")
 @Controller("auth")
@@ -20,6 +31,7 @@ export class YouTubeAuthController {
   ) {}
 
   @Get("login")
+  @SkipThrottle()
   redirectToGoogle(@Res() res: Response) {
     const url = this.youtubeAuthService.getAuthUrl();
     return res.redirect(url);
@@ -33,13 +45,23 @@ export class YouTubeAuthController {
       const { streamer } =
         await this.youtubeAuthService.handleOAuthCallback(code);
 
-      const token = this.authService.generateToken({
+      const token = await this.authService.generateToken({
         streamerId: streamer.id,
         email: streamer.email,
       });
 
+      const csrfToken = randomBytes(32).toString("hex");
+
       res.cookie(COOKIE_NAME, token, {
         httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        path: "/",
+      });
+
+      res.cookie(CSRF_COOKIE_NAME, csrfToken, {
+        httpOnly: false,
         secure: isProduction,
         sameSite: isProduction ? "none" : "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -50,14 +72,20 @@ export class YouTubeAuthController {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       return res.redirect(
-        `${frontendUrl}/login?error=${encodeURIComponent(message)}`,
+        `${frontendUrl}/auth/login?error=${encodeURIComponent(message)}`,
       );
     }
   }
 
   @Post("logout")
-  logout(@Res() res: Response) {
+  @UseGuards(JwtAuthGuard)
+  async logout(@Req() req: any, @Res() res: Response) {
+    if (req.jti) {
+      await this.authService.revokeSession(req.jti);
+    }
+
     res.clearCookie(COOKIE_NAME, { path: "/" });
+    res.clearCookie(CSRF_COOKIE_NAME, { path: "/" });
     return res.json({ success: true });
   }
 

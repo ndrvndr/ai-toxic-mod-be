@@ -7,7 +7,7 @@ import { AuthService } from "./auth.service";
 export class JwtAuthGuard implements CanActivate {
   constructor(private authService: AuthService) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
     const token = this.extractToken(request);
@@ -17,9 +17,17 @@ export class JwtAuthGuard implements CanActivate {
 
     try {
       const payload = this.authService.verifyToken(token);
+
+      const isActive = await this.authService.isSessionActive(payload.jti);
+      if (!isActive) {
+        throw new UnauthorizedException("Session has been revoked");
+      }
+
       request.streamerId = payload.streamerId;
+      request.jti = payload.jti;
       return true;
-    } catch {
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error;
       throw new UnauthorizedException("Invalid or expired token");
     }
   }

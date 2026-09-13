@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiQuery, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 
 import { CurrentStreamer } from "../auth/current-streamer.decorator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -79,6 +80,7 @@ export class LiveSessionsController {
   }
 
   @Post("start-monitoring")
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async startMonitoring(@CurrentStreamer() streamerId: string) {
     const data = await this.liveSessionsService.startMonitoring(streamerId);
     return { data };
