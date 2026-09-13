@@ -129,6 +129,23 @@ export class YouTubeListenerService {
           return;
         }
 
+        if (reason === "pageTokenInvalid" || error?.code === 400) {
+          this.logger.warn(
+            `Invalid pageToken for session ${liveSessionId}, resetting to resume from latest messages.`,
+          );
+          pageToken = undefined;
+          await this.prisma.db.orm.public.LiveSession.where({
+            id: liveSessionId,
+          }).update({
+            nextPageToken: null,
+          });
+
+          if (!polling.stopped) {
+            polling.timer = setTimeout(poll, 5000);
+          }
+          return;
+        }
+
         this.logger.error(`Polling error for session ${liveSessionId}:`, error);
         if (!polling.stopped) {
           polling.timer = setTimeout(poll, 5000);

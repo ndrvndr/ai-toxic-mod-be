@@ -16,9 +16,13 @@ export interface ModerationJobData {
   message: NormalizedChatMessage;
 }
 
+const FAILURE_ALERT_THRESHOLD = 3;
+
 @Processor("moderation-queue")
 export class ModerationProcessor extends WorkerHost {
   private readonly logger = new Logger(ModerationProcessor.name);
+
+  private consecutiveFailures = new Map<string, number>();
 
   constructor(
     private moderationCore: ModerationCoreService,
@@ -33,7 +37,6 @@ export class ModerationProcessor extends WorkerHost {
     const { liveSessionId, liveChatId, streamerId, connectionId, message } =
       job.data;
 
-    // 1. Save the chat message to the database first.
     let chatMessage;
     try {
       chatMessage = await this.prisma.db.orm.public.ChatMessage.create({
@@ -51,14 +54,12 @@ export class ModerationProcessor extends WorkerHost {
       return;
     }
 
-    // 2. Process via moderation core (classify + rule engine)
     const decision = await this.moderationCore.processMessage(
       chatMessage.id,
       streamerId,
       message,
     );
 
-    // Update the normalized message text that was not populated during creation.
     await this.prisma.db.orm.public.ChatMessage.where({
       id: chatMessage.id,
     }).update({
@@ -78,12 +79,10 @@ export class ModerationProcessor extends WorkerHost {
       reason: decision.reason,
     });
 
-    // 3. If action needs to be taken, save it to moderation_actions.
     if (!decision.shouldTakeAction || decision.actionType === "none") {
       return;
     }
 
-    // Save the action record with a 'pending' status first
     const action = await this.prisma.db.orm.public.ModerationAction.create({
       chatMessageId: chatMessage.id,
       actionType: decision.actionType as any,
@@ -92,7 +91,6 @@ export class ModerationProcessor extends WorkerHost {
       status: "pending",
     });
 
-    // Get the refreshToken for execution
     const connection = await this.prisma.db.orm.public.PlatformConnection.where(
       {
         id: connectionId,
@@ -106,6 +104,11 @@ export class ModerationProcessor extends WorkerHost {
         status: "failed",
         errorMessage: "No refresh token available",
       });
+      this.handleActionFailure(
+        streamerId,
+        liveSessionId,
+        "No refresh token available",
+      );
       return;
     }
 
@@ -130,5 +133,35 @@ export class ModerationProcessor extends WorkerHost {
       status: result.success ? "success" : "failed",
       reason: decision.reason,
     });
+
+    if (result.success) {
+      this.consecutiveFailures.delete(streamerId);
+    } else {
+      this.handleActionFailure(
+        streamerId,
+        liveSessionId,
+        result.errorMessage ?? "Unknown error",
+      );
+    }
+  }
+
+  private handleActionFailure(
+    streamerId: string,
+    liveSessionId: string,
+    errorMessage: string,
+  ) {
+    const count = (this.consecutiveFailures.get(streamerId) ?? 0) + 1;
+    this.consecutiveFailures.set(streamerId, count);
+
+    this.logger.warn(
+      `Consecutive action failures for streamer ${streamerId}: ${count}`,
+    );
+
+    if (count >= FAILURE_ALERT_THRESHOLD) {
+      this.gateway.notifySystemAlert(liveSessionId, {
+        severity: "error",
+        message: `Moderation actions have failed ${count} times in a row. Reason: ${errorMessage}. Your YouTube connection may need to be reconnected.`,
+      });
+    }
   }
 }

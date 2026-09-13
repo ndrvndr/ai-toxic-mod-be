@@ -121,4 +121,13 @@ export class ModerationGateway
       .to(`live-session:${liveSessionId}`)
       .emit("moderation-action", payload);
   }
+
+  notifySystemAlert(
+    liveSessionId: string,
+    payload: { severity: "error" | "warning"; message: string },
+  ) {
+    this.server
+      .to(`live-session:${liveSessionId}`)
+      .emit("system-alert", payload);
+  }
 }
