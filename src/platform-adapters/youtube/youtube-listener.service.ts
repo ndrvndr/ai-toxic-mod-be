@@ -30,9 +30,6 @@ export class YouTubeListenerService {
     return client;
   }
 
-  /**
-   * Find the active live broadcast on the channel and return its liveChatId.
-   */
   async findActiveLiveChatId(refreshToken: string): Promise<string | null> {
     const client = this.createOAuthClient(refreshToken);
     const youtube = google.youtube({ version: "v3", auth: client });
@@ -46,10 +43,6 @@ export class YouTubeListenerService {
     return response.data.items?.[0]?.snippet?.liveChatId ?? null;
   }
 
-  /**
-   * Start a live chat poll for a liveSession.
-   * Continues running in the background until stopListening() is called.
-   */
   async startListening(
     liveSessionId: string,
     refreshToken: string,
@@ -65,7 +58,6 @@ export class YouTubeListenerService {
     const client = this.createOAuthClient(refreshToken);
     const youtube = google.youtube({ version: "v3", auth: client });
 
-    // Retrieve the stored next_page_token (if resuming from a previous session).
     const session = await this.prisma.db.orm.public.LiveSession.where({
       id: liveSessionId,
     }).first();
@@ -84,6 +76,14 @@ export class YouTubeListenerService {
           part: ["snippet", "authorDetails"],
           pageToken,
         });
+
+        if (response.data.offlineAt) {
+          this.logger.log(
+            `Live session ${liveSessionId} ended (offlineAt detected). Stopping listener.`,
+          );
+          await this.handleSessionEnded(liveSessionId);
+          return;
+        }
 
         for (const item of response.data.items ?? []) {
           if (!item.id || !item.snippet?.textMessageDetails?.messageText)
@@ -105,7 +105,6 @@ export class YouTubeListenerService {
 
         pageToken = response.data.nextPageToken ?? undefined;
 
-        // Save the pageToken so that it can resume if the service restarts.
         await this.prisma.db.orm.public.LiveSession.where({
           id: liveSessionId,
         }).update({
@@ -117,9 +116,20 @@ export class YouTubeListenerService {
         if (!polling.stopped) {
           polling.timer = setTimeout(poll, interval);
         }
-      } catch (error) {
+      } catch (error: any) {
+        const reason =
+          error?.errors?.[0]?.reason ??
+          error?.response?.data?.error?.errors?.[0]?.reason;
+
+        if (reason === "liveChatEnded" || reason === "liveChatNotFound") {
+          this.logger.log(
+            `Live session ${liveSessionId} ended (${reason}). Stopping listener.`,
+          );
+          await this.handleSessionEnded(liveSessionId);
+          return;
+        }
+
         this.logger.error(`Polling error for session ${liveSessionId}:`, error);
-        // Retry after a delay if not stopped.
         if (!polling.stopped) {
           polling.timer = setTimeout(poll, 5000);
         }
@@ -127,6 +137,16 @@ export class YouTubeListenerService {
     };
 
     await poll();
+  }
+
+  private async handleSessionEnded(liveSessionId: string): Promise<void> {
+    this.stopListening(liveSessionId);
+    await this.prisma.db.orm.public.LiveSession.where({
+      id: liveSessionId,
+    }).update({
+      status: "ended",
+      endedAt: new Date().toISOString(),
+    });
   }
 
   stopListening(liveSessionId: string): void {
@@ -142,9 +162,7 @@ export class YouTubeListenerService {
     return this.activePollings.has(liveSessionId);
   }
 
-  async findActiveBroadcast(
-    refreshToken: string,
-  ): Promise<{
+  async findActiveBroadcast(refreshToken: string): Promise<{
     broadcastId: string;
     liveChatId: string;
     title: string;

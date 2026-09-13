@@ -1205,7 +1205,14 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "liveSessionId",
+                    "platformMessageId"
+                  ]
+                }
+              ]
             },
             "live_sessions": {
               "checks": [
@@ -1946,7 +1953,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "97151647bcd94f1cc39e0cd55d745a6700f8d30aedcfb4bbe1cb0f65cd4193e7"
+    "storageHash": "a4c9e92c572c29e44502af48854577ba3ed72da352a5154e94e8d571bfb37588"
   },
   "execution": {
     "executionHash": "346255951db6b783a22b13dee804086ce0b5d75a347155d39a958b620024dcb0",

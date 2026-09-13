@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import type { Queue } from "bullmq";
+import Redis from "ioredis";
 
 import type { NormalizedChatMessage } from "../platform-adapters/interfaces";
 import { YouTubeListenerService } from "../platform-adapters/youtube/youtube-listener.service";
@@ -15,11 +16,18 @@ import type { ModerationJobData } from "../queue/moderation.processor";
 
 @Injectable()
 export class LiveSessionsService {
+  private redis: Redis;
+
   constructor(
     private youtubeListener: YouTubeListenerService,
     @Inject(getQueueToken("moderation-queue"))
     private moderationQueue: Queue<ModerationJobData>,
-  ) {}
+  ) {
+    this.redis = new Redis({
+      host: process.env.REDIS_HOST ?? "localhost",
+      port: Number(process.env.REDIS_PORT ?? 6379),
+    });
+  }
 
   async list(streamerId: string) {
     const connections = await db.orm.public.PlatformConnection.where({
@@ -165,83 +173,105 @@ export class LiveSessionsService {
   }
 
   async startMonitoring(streamerId: string) {
-    const connection = await db.orm.public.PlatformConnection.where({
-      streamerId,
-      platform: "youtube",
-      isActive: true,
-    }).first();
+    const lockKey = `lock:start-monitoring:${streamerId}`;
+    const acquired = await this.redis.set(lockKey, "1", "EX", 10, "NX");
 
-    if (!connection?.refreshToken) {
+    if (!acquired) {
       throw new BadRequestException(
-        "No active YouTube connection found. Please connect your YouTube account first.",
+        "A monitoring start request is already in progress. Please wait.",
       );
     }
 
-    const broadcast = await this.youtubeListener.findActiveBroadcast(
-      connection.refreshToken,
-    );
-    if (!broadcast) {
-      throw new BadRequestException(
-        "No active live stream found on your YouTube channel.",
+    try {
+      const connection = await db.orm.public.PlatformConnection.where({
+        streamerId,
+        platform: "youtube",
+        isActive: true,
+      }).first();
+
+      if (!connection?.refreshToken) {
+        throw new BadRequestException(
+          "No active YouTube connection found. Please connect your YouTube account first.",
+        );
+      }
+
+      const broadcast = await this.youtubeListener.findActiveBroadcast(
+        connection.refreshToken,
       );
-    }
+      if (!broadcast) {
+        throw new BadRequestException(
+          "No active live stream found on your YouTube channel.",
+        );
+      }
 
-    const { broadcastId, liveChatId, title } = broadcast;
+      const { broadcastId, liveChatId, title } = broadcast;
 
-    let session = await db.orm.public.LiveSession.where({
-      connectionId: connection.id,
-      platformLiveId: broadcastId,
-    }).first();
-
-    if (!session) {
-      const staleSessions = await db.orm.public.LiveSession.where({
+      let session = await db.orm.public.LiveSession.where({
         connectionId: connection.id,
-        status: "live",
-      }).all();
+        platformLiveId: broadcastId,
+      }).first();
 
-      for (const stale of staleSessions) {
-        this.youtubeListener.stopListening(stale.id);
-        await db.orm.public.LiveSession.where({ id: stale.id }).update({
-          status: "ended",
-          endedAt: new Date().toISOString(),
+      if (!session) {
+        const staleSessions = await db.orm.public.LiveSession.where({
+          connectionId: connection.id,
+          status: "live",
+        }).all();
+
+        for (const stale of staleSessions) {
+          this.youtubeListener.stopListening(stale.id);
+          await db.orm.public.LiveSession.where({ id: stale.id }).update({
+            status: "ended",
+            endedAt: new Date().toISOString(),
+          });
+        }
+
+        session = await db.orm.public.LiveSession.create({
+          connectionId: connection.id,
+          platformLiveId: broadcastId,
+          title,
+          status: "live",
         });
       }
 
-      session = await db.orm.public.LiveSession.create({
-        connectionId: connection.id,
-        platformLiveId: broadcastId,
-        title,
-        status: "live",
-      });
+      if (!session) {
+        throw new BadRequestException("Failed to create live session");
+      }
+
+      if (this.youtubeListener.isListening(session.id)) {
+        return { session, message: "Already monitoring this session" };
+      }
+
+      const sessionId = session.id;
+
+      await this.youtubeListener.startListening(
+        sessionId,
+        connection.refreshToken,
+        liveChatId,
+        async (connId: string, message: NormalizedChatMessage) => {
+          await this.moderationQueue.add(
+            "process-message",
+            {
+              connectionId: connId,
+              streamerId,
+              liveSessionId: sessionId,
+              liveChatId,
+              message,
+            } satisfies ModerationJobData,
+            {
+              attempts: 3,
+              backoff: { type: "exponential", delay: 2000 },
+              removeOnComplete: { age: 3600 },
+              removeOnFail: false,
+            },
+          );
+        },
+        connection.id,
+      );
+
+      return { session, message: "Monitoring started" };
+    } finally {
+      await this.redis.del(lockKey);
     }
-
-    if (!session) {
-      throw new BadRequestException("Failed to create live session");
-    }
-
-    if (this.youtubeListener.isListening(session.id)) {
-      return { session, message: "Already monitoring this session" };
-    }
-
-    const sessionId = session.id;
-
-    await this.youtubeListener.startListening(
-      sessionId,
-      connection.refreshToken,
-      liveChatId,
-      async (connId: string, message: NormalizedChatMessage) => {
-        await this.moderationQueue.add("process-message", {
-          connectionId: connId,
-          streamerId,
-          liveSessionId: sessionId,
-          liveChatId,
-          message,
-        } satisfies ModerationJobData);
-      },
-      connection.id,
-    );
-
-    return { session, message: "Monitoring started" };
   }
 
   async stopMonitoring(streamerId: string, liveSessionId: string) {

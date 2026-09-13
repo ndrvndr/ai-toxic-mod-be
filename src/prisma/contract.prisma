@@ -127,6 +127,7 @@ model ChatMessage {
 
   createdAt TimestamptzString @default(now())
 
+  @@unique([liveSessionId, platformMessageId])
   @@index([liveSessionId, sentAt])
   @@map("chat_messages")
 }

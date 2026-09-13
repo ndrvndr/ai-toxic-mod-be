@@ -34,14 +34,22 @@ export class ModerationProcessor extends WorkerHost {
       job.data;
 
     // 1. Save the chat message to the database first.
-    const chatMessage = await this.prisma.db.orm.public.ChatMessage.create({
-      liveSessionId,
-      platformMessageId: message.platformMessageId,
-      platformUserId: message.platformUserId,
-      authorDisplayName: message.authorDisplayName,
-      messageText: message.text,
-      sentAt: new Date(message.sentAt).toISOString(),
-    });
+    let chatMessage;
+    try {
+      chatMessage = await this.prisma.db.orm.public.ChatMessage.create({
+        liveSessionId,
+        platformMessageId: message.platformMessageId,
+        platformUserId: message.platformUserId,
+        authorDisplayName: message.authorDisplayName,
+        messageText: message.text,
+        sentAt: new Date(message.sentAt).toISOString(),
+      });
+    } catch (error: any) {
+      this.logger.warn(
+        `Skipping duplicate message ${message.platformMessageId} for session ${liveSessionId}`,
+      );
+      return;
+    }
 
     // 2. Process via moderation core (classify + rule engine)
     const decision = await this.moderationCore.processMessage(
