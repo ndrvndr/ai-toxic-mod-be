@@ -2,6 +2,7 @@ import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
+import { ScheduleModule } from "@nestjs/schedule";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 
 import { AuthModule } from "./auth/auth.module";
@@ -41,6 +42,7 @@ import { WebsocketModule } from "./websocket/websocket.module";
         limit: 100,
       },
     ]),
+    ScheduleModule.forRoot(),
   ],
   controllers: [],
   providers: [

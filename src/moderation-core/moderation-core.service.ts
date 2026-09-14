@@ -3,6 +3,7 @@ import { Injectable } from "@nestjs/common";
 import type { NormalizedChatMessage } from "../platform-adapters/interfaces";
 import { PrismaService } from "../prisma.service";
 import { RuleEngineService } from "./rule-engine.service";
+import { normalizeText } from "./text-normalizer";
 import { ToxicityClassifierService } from "./toxicity-classifier.service";
 
 export interface ModerationDecision {
@@ -11,17 +12,6 @@ export interface ModerationDecision {
   reason: string;
   normalizedText: string;
 }
-
-const LEETSPEAK_MAP: Record<string, string> = {
-  "1": "i",
-  "3": "e",
-  "4": "a",
-  "0": "o",
-  "7": "t",
-  "5": "s",
-  "@": "a",
-  $: "s",
-};
 
 @Injectable()
 export class ModerationCoreService {
@@ -37,12 +27,14 @@ export class ModerationCoreService {
     message: NormalizedChatMessage,
   ): Promise<ModerationDecision> {
     const start = Date.now();
-    const normalizedText = this.normalizeText(message.text);
+    const normalizedMessageText = normalizeText(message.text);
 
-    const classification = await this.classifier.classify(normalizedText);
+    const classification = await this.classifier.classify(
+      normalizedMessageText,
+    );
     const ruleResult = await this.ruleEngine.evaluate(
       streamerId,
-      normalizedText,
+      normalizedMessageText,
       classification,
     );
 
@@ -62,21 +54,7 @@ export class ModerationCoreService {
       shouldTakeAction: ruleResult.shouldTakeAction,
       actionType: ruleResult.actionType,
       reason: ruleResult.reason,
-      normalizedText,
+      normalizedText: normalizedMessageText,
     };
-  }
-
-  private normalizeText(text: string): string {
-    const lowercased = text.toLowerCase();
-
-    const leetReplaced = lowercased.replace(
-      /[134705$@]/g,
-      (match) => LEETSPEAK_MAP[match] ?? match,
-    );
-
-    return leetReplaced
-      .replace(/[^a-z\s]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
   }
 }

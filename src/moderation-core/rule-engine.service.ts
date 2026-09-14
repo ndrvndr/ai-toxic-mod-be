@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 
 import type { ActionType } from "../platform-adapters/interfaces";
 import { PrismaService } from "../prisma.service";
+import { normalizeText } from "./text-normalizer";
 import type { ToxicityClassification } from "./toxicity-classifier.service";
 
 export interface RuleEvaluationResult {
@@ -25,10 +26,10 @@ export class RuleEngineService {
       isActive: true,
     }).all();
 
-    // 1. Whitelist check
     const whitelistRules = rules.filter((r) => r.ruleType === "whitelist_word");
     for (const rule of whitelistRules) {
-      const word = (rule.value as { word?: string })?.word?.toLowerCase();
+      const rawWord = (rule.value as { word?: string })?.word;
+      const word = rawWord ? normalizeText(rawWord) : undefined;
       if (word && normalizedText.includes(word)) {
         return {
           shouldTakeAction: false,
@@ -39,13 +40,13 @@ export class RuleEngineService {
       }
     }
 
-    // 2. Blacklist check
     const blacklistRules = rules.filter((r) => r.ruleType === "blacklist_word");
     const matchedWords: string[] = [];
     let blacklistAction: ActionType | null = null;
 
     for (const rule of blacklistRules) {
-      const word = (rule.value as { word?: string })?.word?.toLowerCase();
+      const rawWord = (rule.value as { word?: string })?.word;
+      const word = rawWord ? normalizeText(rawWord) : undefined;
       if (word && normalizedText.includes(word)) {
         matchedWords.push(word);
         blacklistAction = rule.actionOnTrigger;
@@ -61,7 +62,6 @@ export class RuleEngineService {
       };
     }
 
-    // 3. Threshold check
     const thresholdRule = rules.find((r) => r.ruleType === "threshold");
     const customThreshold = (thresholdRule?.value as { threshold?: number })
       ?.threshold;
@@ -76,7 +76,6 @@ export class RuleEngineService {
       };
     }
 
-    // 4. Borderline
     if (classification.label === "borderline") {
       return {
         shouldTakeAction: true,
@@ -86,7 +85,6 @@ export class RuleEngineService {
       };
     }
 
-    // 5. Safe
     return {
       shouldTakeAction: false,
       actionType: "none",

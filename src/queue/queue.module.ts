@@ -4,6 +4,7 @@ import { Module } from "@nestjs/common";
 import { ModerationCoreModule } from "../moderation-core/moderation-core.module";
 import { YouTubeModule } from "../platform-adapters/youtube/youtube.module";
 import { WebsocketModule } from "../websocket/websocket.module";
+import { DataRetentionService } from "./data-retention.service";
 import { ModerationQueueEventsService } from "./moderation-queue-events.service";
 import { ModerationProcessor } from "./moderation.processor";
 
@@ -16,7 +17,11 @@ import { ModerationProcessor } from "./moderation.processor";
     YouTubeModule,
     WebsocketModule,
   ],
-  providers: [ModerationProcessor, ModerationQueueEventsService],
+  providers: [
+    ModerationProcessor,
+    ModerationQueueEventsService,
+    DataRetentionService,
+  ],
   exports: [BullModule],
 })
 export class QueueModule {}

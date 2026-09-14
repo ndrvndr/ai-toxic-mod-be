@@ -159,14 +159,15 @@ Everything described above as "verified" or "tested" was exercised against a rea
 - Multi-label toxicity classification on English messages
 - Blacklist-word matching, including leetspeak-normalized matches
 - Threshold-based flagging on English messages, including subtle/sarcastic phrasing without explicit profanity
-- `delete` action executed against the YouTube Data API, confirmed removed from the chat via a follow-up API read
+- `delete`, `ban`, and `timeout` actions all executed against the YouTube Data API and confirmed working end-to-end: `delete` verified by re-reading the chat via the API, `timeout` confirmed via YouTube's on-screen restriction notice to the affected user, and `ban` confirmed by the targeted user's messages no longer appearing in chat even after the timeout window would have expired
 - Real-time WebSocket broadcast of both new messages and moderation actions
 - REST endpoints for rules CRUD, live session listing, message history, and analytics
+- Consecutive action-failure alerting via WebSocket system-alert events
+- CSRF protection, rate limiting, and session revocation (verified: a token used after logout is correctly rejected)
 
 **Implemented but not yet exercised in live testing:**
 
 - Whitelist-word rules (the code path exists in `RuleEngineService`, but no whitelist rule has been created and tested against real chat)
-- `ban` and `timeout` actions (implemented in `YouTubeActionExecutorService` following the same pattern as `delete`, but never triggered against a real live chat user)
 
 ## Known Limitations
 
